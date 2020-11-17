@@ -16,6 +16,9 @@ def get_parts(ind):
     i3 = int(ind / BOARD_SZ**2) % 2
     return i1, i2, i3
 
+def valid(r, c):
+    return (r >= 0 and r < BOARD_SZ and c >= 0 and c < BOARD_SZ)
+
 
 board = np.zeros((BOARD_SZ, BOARD_SZ), dtype='str')
 
@@ -41,8 +44,9 @@ for elem in states.flatten():
 
 for x in range(len(ship_lens)): # lowest to greatest length
     ship_len = ship_lens[x]
-    ## PREPROCESS:  REMOVE EDGE THINGS: anything either RIGHT or DOWN of (BOARD_SZ - ship_len) ##
+    ship_char = ship_chars[x]
 
+    ## PREPROCESS:  REMOVE EDGE THINGS: anything either RIGHT or DOWN of (BOARD_SZ - ship_len) ##
     # dir = 0: horizontal (so COLs clipped); dir = 1: vertical (so ROWs clipped)
     for dim1 in range(BOARD_SZ - ship_len + 1, BOARD_SZ):
         for dim2 in range(BOARD_SZ):
@@ -55,8 +59,27 @@ for x in range(len(ship_lens)): # lowest to greatest length
             if(remove_ind_horiz in rem_states):
                 rem_states.remove(remove_ind_horiz)
 
-    # print(ship_len)
-    # print(len(rem_states))
+    ## PREPROCESS PART 2: for EVERY PLACE THAT HAS A SHIP MARKER:
+    #  ensure that everything above or to the left within current ship size is OUT
+    for row in range(BOARD_SZ):
+        for col in range(BOARD_SZ):
+
+            if(board[row][col]!=''): # THERE IS SOMETHING THERE
+                for newc in range(col-ship_len+1, col):
+                    if(not valid(row, newc)):
+                        continue
+                    states[row][newc][0]=False # could be overwriting something that's already False, that's fine (can put inside 'if' as well, doesn't matter)
+                    remove_ind = get_ind(row, newc, 0)
+                    if(remove_ind in rem_states):
+                        rem_states.remove(remove_ind)
+
+                for newr in range(row-ship_len+1, row):
+                    if(not valid(newr, col)):
+                        continue
+                    states[newr][col][1]=False
+                    remove_ind = get_ind(newr, col, 1)
+                    if(remove_ind in rem_states):
+                        rem_states.remove(remove_ind)
 
 
     rand = random.randint(0, len(rem_states)) # 0 to 199 for 10 x 10
@@ -67,24 +90,28 @@ for x in range(len(ship_lens)): # lowest to greatest length
     # i3: 0 = LEFT (horizontal), 1 = TOP (vertical)
 
     # PLACE THIS SHIP
-    for k in range(len(ship_len)):
+    for k in range(ship_len):
         if(i3 == 0): # HORIZONTAL placement
-            states[i1][i2+k][i3]=False
-            remove_ind = get_ind(i1, i2+k, i3)
-            if(remove_ind in rem_states):
-                rem_states.remove(remove_ind)
+            new_i1 = i1
+            new_i2 = i2+k
+
         else:
-            states[i1+k][i2][i3]=False
-            remove_ind = get_ind(i1+k, i2, i3)
-            if(remove_ind in rem_states):
-                rem_states.remove(remove_ind)
+            new_i1 = i1+k
+            new_i2 = i2
+
+        board[new_i1][new_i2]=ship_char
+
+        states[new_i1][new_i2][i3]=False
+        states[new_i1][new_i2][(i3+1)%2]=False
+
+        remove_ind = get_ind(new_i1, new_i2, i3)
+        if(remove_ind in rem_states):
+            rem_states.remove(remove_ind)
+
+        remove_ind = get_ind(new_i1, new_i2, (i3+1)%2)
+        if(remove_ind in rem_states):
+            rem_states.remove(remove_ind)
 
 
-    # orient = random.randint(0, 1) # 0 = horizontal, 1 = vertical
-    # dim1_edge_loc = random.randint(0, BOARD_SZ-ship_len) # the index on the constrained dimension
-    # dim2_edge_loc = random.randint(0, BOARD_SZ)
-    #
-    # if(orient == 0): #horizontal
-    #     for i in range()
-    # else:
-    #     asdf
+
+print(board)
