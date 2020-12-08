@@ -2,6 +2,15 @@
 ## computational solver
 ## based on probabilistic computations (using randomized sampling of statespace)
 ##
+## OPERATION INSTRUCTIONS:
+## - after each command from user, algorithm will suggest which square to probe
+## commands from user:
+##  - "start" (or anything random) to begin
+##  - "miss R C" to indicate that user's guess of [R, C] was a miss
+##  - "R C ship_char minR minC maxR maxC" to indicate that user's guess of R C caused a hit that sank ship denoted by ship_char (c, b, d, s, p),
+##     which spanned [minR --> maxR] and [minC --> maxC] (note that one of these pairs should always be the same)
+##  - "hit R C" to indicate that user's guess of [R, C] was a hit, but did NOT SINK any ships
+##
 ## author: Arya Maheshwari
 ##
 ## created: 12.07.20
