@@ -1,3 +1,12 @@
+## ------- BATTLESHIP -------
+## computational solver
+## based on probabilistic computations (using randomized sampling of statespace)
+##
+## author: Arya Maheshwari
+##
+## created: 12.07.20
+
+
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
@@ -147,6 +156,11 @@ ACTIVE_HIT = False
 hit_loc = [None, None] # [row, col]
 
 LINE_FOUND = False
+# adj_line_loc = [None, None]
+
+line_min_loc = [None, None]
+line_max_loc = [None, None]
+
 
 USER_BOARD = np.zeros((BOARD_SZ, BOARD_SZ), dtype='U10')
 ship_ind_list = [0, 1, 2, 3, 4]
@@ -159,22 +173,41 @@ N = 1000 # for simulations
 def hit(r, c):
     global ACTIVE_HIT # why only need this here??
     global LINE_FOUND
+    global line_min_loc
+    global line_max_loc
 
     USER_BOARD[r][c]='H'
     if(not ACTIVE_HIT):
         ACTIVE_HIT = True
         hit_loc[0]=r
         hit_loc[1]=c
-    else:
+        line_min_loc = hit_loc
+        line_max_loc = hit_loc
+    elif (ACTIVE_HIT and not LINE_FOUND):
         LINE_FOUND = True # THIS NEEDS FIXING
+        # adj_line_loc[0]=r
+        # adj_line_loc[1]=c
+
+        # note that this shouldn't really be needed at this stage (not used in assess_adj), just updated for consistency
+        line_min_loc = [min(line_min_loc[0], r), min(line_min_loc[1], c)]
+        line_max_loc = [max(line_max_loc[0], r), max(line_max_loc[1], c)]
+
+
+    else: # both true, in progress of tracking down a hit line
+        # just update line bounds
+        line_min_loc = [min(line_min_loc[0], r), min(line_min_loc[1], c)]
+        line_max_loc = [max(line_max_loc[0], r), max(line_max_loc[1], c)]
 
 def miss(r, c):
     USER_BOARD[r][c]='X'
 
 # note: this modifies the ACTUAL, GLOBAL ship_ind_list (not a copy)
+# among other things ... lol
 def ship_sunk(ship_char, ship_r_min, ship_c_min, ship_r_max, ship_c_max):
     global ACTIVE_HIT
     global LINE_FOUND
+    global line_min_loc
+    global line_max_loc
 
     ship_ind = ship_ind_map[ship_char]
     if(not ship_ind in ship_ind_list):
@@ -195,7 +228,6 @@ def ship_sunk(ship_char, ship_r_min, ship_c_min, ship_r_max, ship_c_max):
         print("GAME OVER!")
         return 1
 
-
     LINE_FOUND = False
     ACTIVE_HIT = False
     hit_loc = [None, None]
@@ -205,9 +237,52 @@ def ship_sunk(ship_char, ship_r_min, ship_c_min, ship_r_max, ship_c_max):
         for col in range(BOARD_SZ):
             if(USER_BOARD[row][col]=='H'):
                 ACTIVE_HIT=True
+                print(row, col)
                 hit_loc=[row, col]
 
+                min_c, max_c = find_minmax_horiz(USER_BOARD, row, col)
+                if(min_c is None):
+                    print('looking for vertical lines')
+                    min_r, max_r = find_minmax_vert(USER_BOARD, row, col)
+                    line_min_loc = [min_r, col]
+                    line_max_loc = [max_r, col]
+                    if(min_r != max_r):
+                        # next find_move will go to looking along this line, rather than re-assessing adjacents (ie finding the other direction)
+                        LINE_FOUND = True
+                else:
+                    line_min_loc = [row, min_c]
+                    line_max_loc = [row, max_c]
+                    if(min_c != max_c):
+                        # next find_move will go to looking along this line, rather than re-assessing adjacents (ie finding the other direction)
+                        LINE_FOUND = True
+
+
+
     return 0
+
+def find_minmax_horiz(usr_brd, orig_r, orig_c):
+    min_found = False
+    min, max = None, None
+    for col in range(BOARD_SZ):
+        if(usr_brd[orig_r][col]=='H'):
+            print('found an H')
+            max = col
+            if not(min_found):
+                min=col
+
+    return min, max
+
+def find_minmax_vert(usr_brd, orig_r, orig_c):
+    min_found = False
+    min, max = None, None
+    for row in range(BOARD_SZ):
+        if(usr_brd[row][orig_c]=='H'):
+            print('found an H')
+            max = row
+            if not(min_found):
+                min=row
+
+    return min, max
 
 def find_move():
     global ACTIVE_HIT
@@ -217,15 +292,19 @@ def find_move():
         return run_sim(USER_BOARD, N, ship_ind_list)
 
     elif(ACTIVE_HIT and not LINE_FOUND):
-        return assess_adj(USER_BOARD, hit_loc[0], hit_loc[1], ship_ind_list)
+        return assess_adj(USER_BOARD, hit_loc, ship_ind_list)
 
     else: # both are true
-        print("have fun human!")
-        return 'i','dk'
+        return guess_line(USER_BOARD, line_min_loc, line_max_loc, ship_ind_list)
 
 
-def play_game():
+def play_game(verbose):
+    global ACTIVE_HIT
+    global LINE_FOUND
+
     counter = 0
+    print("BATTLESHIP: NOTES")
+    print("—> 0-indexed: indices are [0, 0] to [9,9]")
 
     command = input("command: ")
     prev_r = -1
@@ -266,7 +345,10 @@ def play_game():
                 return
 
         print(USER_BOARD)
-        print(find_move())
+        if(verbose):
+            print('log: ACTIVE HIT?', ACTIVE_HIT)
+            print('log: LINE FOUND?', LINE_FOUND)
+        print("Suggested move: probe", find_move())
 
         command = input('command: ')
         counter += 1
@@ -421,9 +503,12 @@ def run_sim(usr_brd, n, ship_inds):
     return max_count_r, max_count_c
 
 # what to call if ACTIVE_HIT but *not* LINE_FOUND
-def assess_adj(usr_brd, hit_r, hit_c, ship_inds):
+def assess_adj(usr_brd, hit_loc, ship_inds):
     global ACTIVE_HIT
     global LINE_FOUND
+
+    hit_r = hit_loc[0]
+    hit_c = hit_loc[1]
 
     # keep a running max of which adjacent spot (L, R, U, D) to pick
     max_configs = 0
@@ -444,7 +529,8 @@ def assess_adj(usr_brd, hit_r, hit_c, ship_inds):
         for left_ind in range(hit_c-ship_len+1, hit_c+1): # the left index of ship could be anywhere between these two values (pre-additional checking)
             VIABLE = True
             for step in range(left_ind, left_ind+ship_len):
-                if not(valid(hit_r, step) and (usr_brd[hit_r][step]=='' or usr_brd[hit_r][step]=='H')): # other placed ships will have lowercase letter, these are not valid; misses are X; only CURRENT HITS are 'H'
+                # CHECK THIS UPDATE: MADE THIS 'H' condition stronger, right? (it HAS to be the hit location too, because we don't want to re-guess earlier H things)
+                if not(valid(hit_r, step) and (usr_brd[hit_r][step]=='' or (usr_brd[hit_r][step]=='H' and step==hit_c))): # other placed ships will have lowercase letter, these are not valid; misses are X; only CURRENT HITS are 'H'
                     VIABLE=False
 
             # print(VIABLE)
@@ -469,7 +555,7 @@ def assess_adj(usr_brd, hit_r, hit_c, ship_inds):
         for up_ind in range(hit_r-ship_len+1, hit_r+1): # the left index of ship could be anywhere between these two values (pre-additional checking)
             VIABLE = True
             for step in range(up_ind, up_ind+ship_len):
-                if not(valid(step, hit_c) and (usr_brd[step][hit_c]=='' or usr_brd[step][hit_c]=='H')): # other placed ships will have lowercase letter, these are not valid; misses are X; only CURRENT HITS are 'H'
+                if not(valid(step, hit_c) and (usr_brd[step][hit_c]=='' or (usr_brd[step][hit_c]=='H' and step==hit_r))): # other placed ships will have lowercase letter, these are not valid; misses are X
                     VIABLE=False
 
             if(VIABLE):
@@ -498,13 +584,138 @@ def assess_adj(usr_brd, hit_r, hit_c, ship_inds):
     else:
         return hit_r+1, hit_c
 
+# call when BOTH ACTIVE_HIT and LINE_FOUND (or equivalently just LINE_FOUND, since ACTIVE_HIT is basically a precondition)
+# generally will just pass in the global variables for min_loc and max_loc
+def guess_line(usr_brd, min_loc, max_loc, ship_inds):
+    global ACTIVE_HIT
+    global LINE_FOUND
 
-# CURRENTLY UNFINISHED: if LINE_FOUND / after initial adjacent determined: relies on user lol
+    line_len = max(max_loc[0]-min_loc[0], max_loc[1]-min_loc[1]) # one of these values should be 0, the other should be what we want (and positive)
+
+    if(max_loc[0] == min_loc[0]): # rows are same, so horizontal
+        return guess_horiz_line(usr_brd, min_loc, max_loc, line_len, ship_inds)
+    else:
+        return guess_vert_line(usr_brd, min_loc, max_loc, line_len, ship_inds)
+
+# HELPERS
+def guess_vert_line(usr_brd, min_loc, max_loc, line_len, ship_inds):
+    global ACTIVE_HIT
+    global LINE_FOUND
+
+    '''
+    min_loc and max_loc will be (a, c) --> (b, c), where b > a
+    '''
+
+    c = min_loc[1]
+    up_loc = (min_loc[0]-1, c)
+    down_loc = (max_loc[0]+1, c)
+
+    max_configs = 0
+
+    up_cts = 0
+    down_cts = 0
+
+    up_max = True
+
+    for x in range(len(SHIP_LENS)): # lowest to greatest length
+        if(x not in ship_inds): # if it's already been found, ignore
+            continue
+        ship_len = SHIP_LENS[x]
+        ship_char = SHIP_CHARS[x]
+
+        for up_ind in range(up_loc[0]-ship_len+1, down_loc[0]): # the left index of ship could be anywhere between these two values (pre-additional checking)
+            VIABLE = True
+            for step in range(up_ind, up_ind+ship_len):
+                # here, unlike assess_adj, we are chill with line hits that aren't the starting/original hit position
+                if not(valid(step, c) and (usr_brd[step][c]=='' or usr_brd[step][c]=='H')): # other placed ships will have lowercase letter, these are not valid; misses are X; only CURRENT HITS are 'H'
+                    VIABLE=False
+
+            if(VIABLE):
+                # CHECK THESE CONDITIONS....
+                if(up_ind <= up_loc[0]):
+                    up_cts+=1 # one config includes UP spot
+                    if(up_cts>max_configs):
+                        max_configs = up_cts
+                        up_max=True
+
+                if(up_ind+ship_len-1 >= down_loc[0]):
+                    down_cts+=1 # one config includes DOWN spot
+                    if(down_cts>max_configs):
+                        max_configs = down_cts
+                        up_max=False
+
+    if(up_cts + down_cts == 0): # if they're both still at 0
+        # WE NEED TO FLIP DIRECTION! (i.e. we can't place any ships along this line anymore...)
+        LINE_FOUND = False
+        assess_adj(usr_brd, hit_loc, ship_inds) # right? just rotate around original hit if still active; if that doesn't work
+
+    elif(up_cts > down_cts):
+        return up_loc[0], up_loc[1]
+    else:
+        return down_loc[0], down_loc[1]
+
+def guess_horiz_line(usr_brd, min_loc, max_loc, line_len, ship_inds):
+    global ACTIVE_HIT
+    global LINE_FOUND
+
+
+    '''
+    min_loc and max_loc will be (r, a) --> (r, b), where b > a
+    '''
+
+    r = min_loc[0]
+    left_loc = (r, min_loc[1]-1)
+    right_loc = (r, max_loc[1]+1)
+
+    left_cts = 0
+    right_cts = 0
+
+    max_configs = 0
+
+    left_max = True
+
+    for x in range(len(SHIP_LENS)): # lowest to greatest length
+        if(x not in ship_inds): # if it's already been found, ignore
+            continue
+        ship_len = SHIP_LENS[x]
+        ship_char = SHIP_CHARS[x]
+
+        for left_ind in range(left_loc[1]-ship_len+1, right_loc[1]): # the left index of ship could be anywhere between these two values (pre-additional checking)
+            VIABLE = True
+            for step in range(left_ind, left_ind+ship_len):
+                # here, unlike assess_adj, we are chill with line hits that aren't the starting/original hit position
+                if not(valid(r, step) and (usr_brd[r][step]=='' or usr_brd[r][step]=='H')): # other placed ships will have lowercase letter, these are not valid; misses are X; only CURRENT HITS are 'H'
+                    VIABLE=False
+
+            if(VIABLE):
+                # CHECK THESE CONDITIONS....
+                if(left_ind <= left_loc[1]):
+                    left_cts+=1 # one config includes UP spot
+                    if(left_cts>max_configs):
+                        max_configs = left_cts
+                        left_max=True
+
+                if(left_ind+ship_len-1 >= right_loc[1]):
+                    right_cts+=1 # one config includes DOWN spot
+                    if(right_cts>max_configs):
+                        max_configs = right_cts
+                        left_max=False
+
+    if(left_cts + right_cts == 0): # if they're both still at 0
+        # WE NEED TO FLIP DIRECTION! (i.e. we can't place any ships along this line anymore...)
+        LINE_FOUND = False
+        assess_adj(usr_brd, hit_loc, ship_inds) # right? just rotate around original hit if still active; if that doesn't work
+
+    elif(left_cts > right_cts):
+        return left_loc[0], left_loc[1]
+    else:
+        return right_loc[0], right_loc[1]
+
 
 
 
 # ----- PLAY THE GAME! ------ #
-play_game()
+play_game(verbose=False)
 
 
 
@@ -515,44 +726,42 @@ play_game()
 
 
 
-### ---------------------------------- ###
+### -------------------------------------------------------------------- ###
 ### ---- CURRENTLY UNUSED STUFF ---- ###
 
-# note: this is a little extra considering the process could be iterative, but restarting brute force each turn is fine for this:
-#  only ~1000 operations
+# # note: this is a little extra considering the process could be iterative, but restarting brute force each turn is fine for this:
+# #  only ~1000 operations
+# #
+# def assess_val(usr_brd):
+#     '''
+#      usr_brd: holds information about misses and hits on board
+#     '''
 #
-# CURRENTLY NOT REALLY NECESSARY: UNUSED
-def assess_val(usr_brd):
-    '''
-     usr_brd: holds information about misses and hits on board
-    '''
-
-    dp = np.zeros((BOARD_SZ, BOARD_SZ, len(SHIP_CHARS)+1, 2))
-
-    for length in range(1, len(SHIP_CHARS)+1):
-        for dir in range(0, 2):
-            for row in range(BOARD_SZ): # note: going from 0 to LEN-1, so DP is for whether RIGHT or BOTTOM edges ok
-                for col in range(BOARD_SZ):
-
-                    valid=(usr_brd[row][col]!='X')
-                    if(length > 1):
-                        if(dir == 0): # horizontal
-                            valid=(valid and valid(row, col-1) and dp[row][col-1][length-1][dir])
-                        else:         # vertical
-                            valid=(valid and valid(row-1, col) and dp[row-1][col][length-1][dir])
-
-                    dp[row][col][length][dir]=valid
-
-    return dp
-
-def probe(i, j, usr_brd, comp_board):
-    if(comp_board[i][j]==''):
-        usr_brd[i][j]='X'
-        print(i, j, "miss")
-    else:
-        usr_brd[i][j]='H'
-        print(i, j, "hit")
-
+#     dp = np.zeros((BOARD_SZ, BOARD_SZ, len(SHIP_CHARS)+1, 2))
+#
+#     for length in range(1, len(SHIP_CHARS)+1):
+#         for dir in range(0, 2):
+#             for row in range(BOARD_SZ): # note: going from 0 to LEN-1, so DP is for whether RIGHT or BOTTOM edges ok
+#                 for col in range(BOARD_SZ):
+#
+#                     valid=(usr_brd[row][col]!='X')
+#                     if(length > 1):
+#                         if(dir == 0): # horizontal
+#                             valid=(valid and valid(row, col-1) and dp[row][col-1][length-1][dir])
+#                         else:         # vertical
+#                             valid=(valid and valid(row-1, col) and dp[row-1][col][length-1][dir])
+#
+#                     dp[row][col][length][dir]=valid
+#
+#     return dp
+#
+# def probe(i, j, usr_brd, comp_board):
+#     if(comp_board[i][j]==''):
+#         usr_brd[i][j]='X'
+#         print(i, j, "miss")
+#     else:
+#         usr_brd[i][j]='H'
+#         print(i, j, "hit")
 
 
 # prob_board = np.zeros((BOARD_SZ, BOARD_SZ))
