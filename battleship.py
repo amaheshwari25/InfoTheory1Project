@@ -241,7 +241,7 @@ def ship_sunk(ship_char, ship_r_min, ship_c_min, ship_r_max, ship_c_max):
     ACTIVE_HIT = False
     hit_loc = [None, None]
 
-    # but check: if there is still a hit remaining not part of this sink, keep active hit on, and RETURN ITS HIT LOC#
+    # but check: if there is still a hit remaining not part of this sink, keep active hit on, and set the hit loc (and line min / max loc)
     for row in range(BOARD_SZ):
         for col in range(BOARD_SZ):
             if(USER_BOARD[row][col]=='H'):
