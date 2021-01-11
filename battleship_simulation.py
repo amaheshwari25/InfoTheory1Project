@@ -374,7 +374,7 @@ def gen_sample(usr_brd_copy, ship_inds):
                         if(remove_ind in rem_states):
                             rem_states.remove(remove_ind)
 
-        if(rem_states==0):
+        if(len(rem_states)==0):
             # when this happens: e.g. if you place a 4-ship in a spot needed for 2 + 3 length ship? then no possible states left in rem_states for this round..
             print("REM STATES 0 from gen_sample with the following user board:")
             print(usr_brd_copy)
@@ -430,8 +430,8 @@ def constrained_guess(usr_midsample_board):
 
     rand = random.randint(0, len(filled_inds)-1)
 
-    guess_c = filled_inds[rand]%10
-    guess_r = (filled_inds[rand]-guess_c)/10
+    guess_c = int(filled_inds[rand]%10)
+    guess_r = int((filled_inds[rand]-guess_c)/10)
 
     return np.array([guess_r, guess_c])
 
@@ -976,11 +976,13 @@ def run_N_games(N):
         query_lengths.append(query_len)
         counts_matched.append(match)
 
+        print("AVERAGE QUERY LENGTH so far:", np.average(query_lengths))
+
     print("\n\n\n")
     print("QUERIES", query_lengths)
-    print("AVERAGE QUERY LENGTH", np.average(np.array(query_lengths)), "\n")
+    print("AVERAGE QUERY LENGTH", np.average(query_lengths), "\n")
     print("RUNTIMES", runtimes)
-    print("AVERAGE RUNTIME", np.average(np.array(runtimes)), "\n")
+    print("AVERAGE RUNTIME", np.average(runtimes), "\n")
     print(counts_matched)
 
 
