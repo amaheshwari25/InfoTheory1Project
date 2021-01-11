@@ -28,22 +28,6 @@ P = 2 # patrol boat length
 SHIP_LENS = [P, S, D, B, C]
 SHIP_CHARS = ['p', 's', 'd', 'b', 'c']
 
-# index = i1 + BOARD_SZ*i2 + (BOARD_SZ^2)*i3
-def get_ind(i1, i2, i3):
-    return i1 + BOARD_SZ*i2 + (BOARD_SZ**2)*i3
-
-def get_parts(ind):
-    i1 = ind % BOARD_SZ
-    i2 = int(ind / BOARD_SZ) % BOARD_SZ
-    i3 = int(ind / BOARD_SZ**2) % 2
-    return i1, i2, i3
-
-def valid(r, c):
-    return (r >= 0 and r < BOARD_SZ and c >= 0 and c < BOARD_SZ)
-
-
-### ------------------------------------------------------------ ###
-### ---- USER FUNCTIONS (actual project) STARTS HERE ---- ###
 GAME_OVER = False
 
 ACTIVE_HIT = False
@@ -61,7 +45,28 @@ ship_ind_list = [0, 1, 2, 3, 4]
 ship_ind_map = {'c':4, 'b':3, 'd':2, 's':1, 'p':0}
 
 N = 1000 # for simulations
-# ---------------- #
+
+HORIZONTAL = np.zeros((len(SHIP_CHARS)), dtype='bool') # true if ship oriented horizontally, false otherwise (p, s, d, b, c)
+
+COMPUTER_BOARD = None
+
+# ------------------------------------------------------ #
+
+# index = i1 + BOARD_SZ*i2 + (BOARD_SZ^2)*i3
+def get_ind(i1, i2, i3):
+    return i1 + BOARD_SZ*i2 + (BOARD_SZ**2)*i3
+
+def get_parts(ind):
+    i1 = ind % BOARD_SZ
+    i2 = int(ind / BOARD_SZ) % BOARD_SZ
+    i3 = int(ind / BOARD_SZ**2) % 2
+    return i1, i2, i3
+
+def valid(r, c):
+    return (r >= 0 and r < BOARD_SZ and c >= 0 and c < BOARD_SZ)
+
+### ------------------------------------------------------------ ###
+### ---- USER FUNCTIONS (actual project) STARTS HERE ---- ###
 
 # not including usr_brd for now as a parameter just to make this user-end friendly
 def hit(r, c):
@@ -95,7 +100,6 @@ def hit(r, c):
 def miss(r, c):
     USER_BOARD[r][c]='X'
 
-
 def ship_sunk(ship_char, ship_r_min, ship_c_min, ship_r_max, ship_c_max):
     global ACTIVE_HIT
     global LINE_FOUND
@@ -103,10 +107,12 @@ def ship_sunk(ship_char, ship_r_min, ship_c_min, ship_r_max, ship_c_max):
     global line_max_loc
     global USER_BOARD
     global hit_loc
+    global ship_ind_list
+    global ship_ind_map
 
     ship_ind = ship_ind_map[ship_char]
     if(not ship_ind in ship_ind_list):
-        print('we have slight problemo 1')
+        print('error: ship to remove not found in list of remaining ships')
     else:
         ship_ind_list.remove(ship_ind)
 
@@ -156,29 +162,68 @@ def ship_sunk(ship_char, ship_r_min, ship_c_min, ship_r_max, ship_c_max):
 
     return 0
 
+# UPDATED VERSION
 def find_minmax_horiz(usr_brd, orig_r, orig_c):
-    min_found = False
-    min, max = None, None
-    for col in range(BOARD_SZ):
-        if(usr_brd[orig_r][col]=='H'):
-            # print('found an H')
-            max = col
-            if not(min_found):
-                min=col
+    print("find_minmax_horiz called on 0-ind position", orig_r, orig_c)
+    #precondition: usr_brd[orig_r][orig_c]='H'
+    if(usr_brd[orig_r][orig_c]!='H'):
+        print("find_minmax_horiz called incorrectly: 0-ind position", orig_r, orig_c, "is not a hit")
+        return None
 
-    return min, max
+    min_col = orig_c
+    while(valid(orig_r, min_col) and usr_brd[orig_r][min_col]=='H'):
+        min_col-=1
 
+    max_col = orig_c
+    while(valid(orig_r, max_col) and usr_brd[orig_r][max_col]=='H'):
+        max_col+=1
+
+    return min_col+1, max_col-1 # shift one back, because went one extra too far
+
+# UPDATED VERSION
 def find_minmax_vert(usr_brd, orig_r, orig_c):
-    min_found = False
-    min, max = None, None
-    for row in range(BOARD_SZ):
-        if(usr_brd[row][orig_c]=='H'):
-            # print('found an H')
-            max = row
-            if not(min_found):
-                min=row
+    print("find_minmax_vert called on 0-ind position", orig_r, orig_c)
 
-    return min, max
+    #precondition: usr_brd[orig_r][orig_c]='H'
+    if(usr_brd[orig_r][orig_c]!='H'):
+        print("find_minmax_horiz called incorrectly: 0-ind position", orig_r, orig_c, "is not a hit")
+        return None
+
+    min_row = orig_r
+    while(valid(min_row, orig_c) and usr_brd[min_row][orig_c]=='H'):
+        min_row-=1
+
+    max_row = orig_r
+    while(valid(max_row, orig_c) and usr_brd[max_row][orig_c]=='H'):
+        max_row+=1
+
+    return min_row+1, max_row-1 # shift one back, because went one extra too far
+
+# def find_minmax_horiz(usr_brd, orig_r, orig_c):
+#     min_found = False
+#     min, max = None, None
+#     for col in range(BOARD_SZ):
+#         if(usr_brd[orig_r][col]=='H'):
+#             # print('found an H')
+#             max = col
+#             if (not min_found):
+#                 min=col
+#                 min_found = True
+#
+#     return min, max
+#
+# def find_minmax_vert(usr_brd, orig_r, orig_c):
+#     min_found = False
+#     min, max = None, None
+#     for row in range(BOARD_SZ):
+#         if(usr_brd[row][orig_c]=='H'):
+#             # print('found an H')
+#             max = row
+#             if (not min_found):
+#                 min=row
+#                 min_found = True
+#
+#     return min, max
 
 # called for each query, to determine recommended move
 def find_move():
@@ -262,7 +307,6 @@ def play_game(verbose):
 
 # ---------------- #
 
-
 # generate one possible simulation instance given current board state
 def gen_sample(usr_brd_copy, ship_inds):
     global ACTIVE_HIT
@@ -314,7 +358,7 @@ def gen_sample(usr_brd_copy, ship_inds):
             for col in range(BOARD_SZ):
 
                 if(usr_brd_copy[row][col]!=''): # THERE IS SOMETHING THERE
-                    for newc in range(col-ship_len+1, col):
+                    for newc in range(col-ship_len+1, col+1): # NEW ADDITION: REMEMBER — *ALSO GET RID OF THIS POSITION*, and range is < not ≤
                         if(not valid(row, newc)):
                             continue
                         states[row][newc][0]=False # could be overwriting something that's already False, that's fine (can put inside 'if' as well, doesn't matter)
@@ -322,7 +366,7 @@ def gen_sample(usr_brd_copy, ship_inds):
                         if(remove_ind in rem_states):
                             rem_states.remove(remove_ind)
 
-                    for newr in range(row-ship_len+1, row):
+                    for newr in range(row-ship_len+1, row+1): # NEW ADDITION: REMEMBER — *ALSO GET RID OF THIS POSITION*, and range is < not ≤
                         if(not valid(newr, col)):
                             continue
                         states[newr][col][1]=False
@@ -330,6 +374,11 @@ def gen_sample(usr_brd_copy, ship_inds):
                         if(remove_ind in rem_states):
                             rem_states.remove(remove_ind)
 
+        if(rem_states==0):
+            # when this happens: e.g. if you place a 4-ship in a spot needed for 2 + 3 length ship? then no possible states left in rem_states for this round..
+            print("REM STATES 0 from gen_sample with the following user board:")
+            print(usr_brd_copy)
+            return constrained_guess(usr_brd_copy)
 
         rand = random.randint(0, len(rem_states)-1) # 0 to 199 for 10 x 10
         # print(len(rem_states))
@@ -367,6 +416,27 @@ def gen_sample(usr_brd_copy, ship_inds):
     # print('done')
     return usr_brd_copy
 
+# called by gen_sample if, in the middle of generating sample, an "impossibility" is encountered
+# this suggests that one of the previously-filled squares must be used for a different ship than the one placed in it
+# but that tells us that it must have a ship: so this function randomly pick from filled in squares
+def constrained_guess(usr_midsample_board):
+
+    filled_inds = []
+
+    for row in range(BOARD_SZ):
+        for col in range(BOARD_SZ):
+            if(len(usr_midsample_board[row][col])>1): #"SIM_X"
+                filled_inds.append(10*row+col)
+
+    rand = random.randint(0, len(filled_inds)-1)
+
+    guess_c = filled_inds[rand]%10
+    guess_r = (filled_inds[rand]-guess_c)/10
+
+    return np.array([guess_r, guess_c])
+
+
+
 # run_sim is basically the function you want to call if not in an active hit situation
 def run_sim(usr_brd, n, ship_inds):
     global ACTIVE_HIT
@@ -391,8 +461,11 @@ def run_sim(usr_brd, n, ship_inds):
 
         # generate simulation board
         sample = gen_sample(usr_copy, ship_inds)
-        # if(i == 0):
-        #     print(sample)
+
+        if(len(sample.shape)==1): # if 1-dimensional array returned, then *constrained_guess case triggered: returns a value to guess*
+            print("constrained guess received:", sample)
+            return sample[0], sample[1]
+
 
         # get counts
         for row in range(BOARD_SZ):
@@ -642,12 +715,7 @@ def guess_horiz_line(usr_brd, min_loc, max_loc, line_len, ship_inds):
         return right_loc[0], right_loc[1]
 
 
-
-
 ### -------- COMPUTER END STUFF ----------- ###
-
-HORIZONTAL = np.zeros((len(SHIP_CHARS)), dtype='bool') # true if ship oriented horizontally, false otherwise (p, s, d, b, c)
-
 def gen_board():
     global HORIZONTAL
     board = np.zeros((BOARD_SZ, BOARD_SZ), dtype='str')
@@ -685,7 +753,7 @@ def gen_board():
             for col in range(BOARD_SZ):
 
                 if(board[row][col]!=''): # THERE IS SOMETHING THERE
-                    for newc in range(col-ship_len+1, col):
+                    for newc in range(col-ship_len+1, col+1): # NEW ADDITION: REMEMBER — *ALSO GET RID OF THIS POSITION*, and range is < not ≤
                         if(not valid(row, newc)):
                             continue
                         states[row][newc][0]=False # could be overwriting something that's already False, that's fine (can put inside 'if' as well, doesn't matter)
@@ -693,7 +761,7 @@ def gen_board():
                         if(remove_ind in rem_states):
                             rem_states.remove(remove_ind)
 
-                    for newr in range(row-ship_len+1, row):
+                    for newr in range(row-ship_len+1, row+1): # NEW ADDITION: REMEMBER — *ALSO GET RID OF THIS POSITION*, and range is < not ≤
                         if(not valid(newr, col)):
                             continue
                         states[newr][col][1]=False
@@ -737,7 +805,6 @@ def gen_board():
     # print(end_time - start_time)
     return board
 
-
 # return False if nothing sunk
 # returns (R1 C1 R2 C2) of ship if sunk
 def check_sunk(glob_brd, usr_brd, hit_r, hit_c):
@@ -778,7 +845,6 @@ def check_sunk(glob_brd, usr_brd, hit_r, hit_c):
 
     return (ship_type, min_r, min_c, max_r, max_c)
 
-
 def find_command_computer(glob_brd, usr_brd, move_r, move_c): # this takes in 1-INDEXED move
     move_r -= 1 # back to 0-indexed
     move_c -= 1
@@ -793,7 +859,6 @@ def find_command_computer(glob_brd, usr_brd, move_r, move_c): # this takes in 1-
     print("Ship sunk", poss_sunk)
     return str(move_r) + " " + str(move_c) + " " + str(poss_sunk[0]) + " " + str(poss_sunk[1]) + " " + str(poss_sunk[2]) + " " + str(poss_sunk[3]) + " " + str(poss_sunk[4])
 
-
 def check_round_counts(usr_board, count):
     ncount = 0
     for row in usr_board:
@@ -804,8 +869,6 @@ def check_round_counts(usr_board, count):
     return count==ncount
 
 ### ------------- RUN SIM -------------- ###
-COMPUTER_BOARD = None
-# print(horizontal)
 
 # returns number of moves required
 def run_one_game():
@@ -895,7 +958,6 @@ def run_one_game():
 
     return counter, check_round_counts(USER_BOARD, counter)
 
-
 def run_N_games(N):
     query_lengths = []
     counts_matched = []
@@ -920,8 +982,6 @@ def run_N_games(N):
     print("RUNTIMES", runtimes)
     print("AVERAGE RUNTIME", np.average(np.array(runtimes)), "\n")
     print(counts_matched)
-
-
 
 
 print(run_N_games(100))
