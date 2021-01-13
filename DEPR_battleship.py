@@ -2,13 +2,7 @@
 ## computational solver
 ## based on probabilistic computations (using randomized sampling of statespace)
 ##
-## UPDATED PER PROBLEM STATEMENT
-## -- coordinates are given and received as (1,1) to (10, 10)
-##
-## author: Arya Maheshwari
-##
 ## OPERATION INSTRUCTIONS:
-## – can run from terminal by typing "python battleship.py"
 ## - after each command from user, algorithm will suggest which square to probe
 ## commands from user:
 ##  - "start" (or anything random) to begin
@@ -17,9 +11,12 @@
 ##     which spanned [minR --> maxR] and [minC --> maxC] (note that one of these pairs should always be the same)
 ##  - "R C hit" to indicate that user's guess of [R, C] was a hit, but did NOT SINK any ships
 ##
+## author: Arya Maheshwari
 ##
-## created: 01.09.21 / 12.07.20
+## created: 12.07.20
 
+
+## ----- IMPORTANT: UNUPDATED, HAS ERRORS: CHECK NEWER VERSIONS (_simulation, _final, _clean)
 
 import sys
 import numpy as np
@@ -56,6 +53,113 @@ def get_parts(ind):
 def valid(r, c):
     return (r >= 0 and r < BOARD_SZ and c >= 0 and c < BOARD_SZ)
 
+### ------------------------------------------------------------ ###
+### ---- COMP GEN STUFF ---- ###
+
+board = np.zeros((BOARD_SZ, BOARD_SZ), dtype='str')
+
+
+## PROCEDURE: generate random location where to place LEFT or TOP (after determining orientation) ##
+
+def gen_board():
+    board = np.zeros((BOARD_SZ, BOARD_SZ), dtype='str')
+
+    start_time = time.time()
+    states = np.zeros((BOARD_SZ, BOARD_SZ, 2), dtype='bool')
+
+    rem_states = list()
+    ctr = 0
+    for elem in states.flatten():
+        rem_states.append(ctr)
+        ctr+=1
+
+
+    for x in range(len(SHIP_LENS)): # lowest to greatest length
+        ship_len = SHIP_LENS[x]
+        ship_char = SHIP_CHARS[x]
+
+        ## PREPROCESS:  REMOVE EDGE THINGS: anything either RIGHT or DOWN of (BOARD_SZ - ship_len) ##
+        # dir = 0: horizontal (so COLs clipped); dir = 1: vertical (so ROWs clipped)
+        for dim1 in range(BOARD_SZ - ship_len + 1, BOARD_SZ):
+            for dim2 in range(BOARD_SZ):
+                states[dim1][dim2][1]=False
+                states[dim2][dim1][0]=False
+                remove_ind_vert = get_ind(dim1, dim2, 1)
+                remove_ind_horiz = get_ind(dim2, dim1, 0)
+                if(remove_ind_vert in rem_states):
+                    rem_states.remove(remove_ind_vert)
+                if(remove_ind_horiz in rem_states):
+                    rem_states.remove(remove_ind_horiz)
+
+        ## PREPROCESS PART 2: for EVERY PLACE THAT HAS A SHIP MARKER:
+        #  ensure that everything above or to the left within current ship size is OUT
+        for row in range(BOARD_SZ):
+            for col in range(BOARD_SZ):
+
+                if(board[row][col]!=''): # THERE IS SOMETHING THERE
+                    for newc in range(col-ship_len+1, col):
+                        if(not valid(row, newc)):
+                            continue
+                        states[row][newc][0]=False # could be overwriting something that's already False, that's fine (can put inside 'if' as well, doesn't matter)
+                        remove_ind = get_ind(row, newc, 0)
+                        if(remove_ind in rem_states):
+                            rem_states.remove(remove_ind)
+
+                    for newr in range(row-ship_len+1, row):
+                        if(not valid(newr, col)):
+                            continue
+                        states[newr][col][1]=False
+                        remove_ind = get_ind(newr, col, 1)
+                        if(remove_ind in rem_states):
+                            rem_states.remove(remove_ind)
+
+
+        rand = random.randint(0, len(rem_states)) # 0 to 199 for 10 x 10
+        ind = rem_states[rand]
+        i1, i2, i3 = get_parts(ind)
+
+        # (i1, i2) = board position: i1 = row (vert), i2 = col (horiz)
+        # i3: 0 = LEFT (horizontal), 1 = TOP (vertical)
+
+        # PLACE THIS SHIP
+        for k in range(ship_len):
+            if(i3 == 0): # HORIZONTAL placement
+                new_i1 = i1
+                new_i2 = i2+k
+
+            else:
+                new_i1 = i1+k
+                new_i2 = i2
+
+            board[new_i1][new_i2]=ship_char
+
+            states[new_i1][new_i2][i3]=False
+            states[new_i1][new_i2][(i3+1)%2]=False
+
+            remove_ind = get_ind(new_i1, new_i2, i3)
+            if(remove_ind in rem_states):
+                rem_states.remove(remove_ind)
+
+            remove_ind = get_ind(new_i1, new_i2, (i3+1)%2)
+            if(remove_ind in rem_states):
+                rem_states.remove(remove_ind)
+
+    end_time = time.time()
+    print(end_time - start_time)
+    return board
+
+# gen_board()
+# gen_board()
+# gen_board()
+# gen_board()
+# gen_board()
+# gen_board()
+# gen_board()
+# gen_board()
+# gen_board()
+# gen_board()
+
+
 
 ### ------------------------------------------------------------ ###
 ### ---- USER FUNCTIONS (actual project) STARTS HERE ---- ###
@@ -78,7 +182,7 @@ N = 1000 # for simulations
 
 # not including usr_brd for now as a parameter just to make this user-end friendly
 def hit(r, c):
-    global ACTIVE_HIT
+    global ACTIVE_HIT # why only need this here??
     global LINE_FOUND
     global line_min_loc
     global line_max_loc
@@ -108,16 +212,19 @@ def hit(r, c):
 def miss(r, c):
     USER_BOARD[r][c]='X'
 
-
+# note: this modifies the ACTUAL, GLOBAL ship_ind_list (not a copy)
+# among other things ... lol
 def ship_sunk(ship_char, ship_r_min, ship_c_min, ship_r_max, ship_c_max):
     global ACTIVE_HIT
     global LINE_FOUND
     global line_min_loc
     global line_max_loc
+    global ship_ind_list
+    global ship_ind_map
 
     ship_ind = ship_ind_map[ship_char]
     if(not ship_ind in ship_ind_list):
-        print('we have slight problemo')
+        print('error: ship to be removed not found in list of remaining ships')
     else:
         ship_ind_list.remove(ship_ind)
 
@@ -190,33 +297,27 @@ def find_minmax_vert(usr_brd, orig_r, orig_c):
 
     return min, max
 
-# called for each query, to determine recommended move
 def find_move():
     global ACTIVE_HIT
     global LINE_FOUND
 
-    guess_coord = None
     if(not ACTIVE_HIT):
-        guess_coord= run_sim(USER_BOARD, N, ship_ind_list)
+        return run_sim(USER_BOARD, N, ship_ind_list)
 
     elif(ACTIVE_HIT and not LINE_FOUND):
-        guess_coord= assess_adj(USER_BOARD, hit_loc, ship_ind_list)
+        return assess_adj(USER_BOARD, hit_loc, ship_ind_list)
 
     else: # both are true
-        guess_coord= guess_line(USER_BOARD, line_min_loc, line_max_loc, ship_ind_list)
+        return guess_line(USER_BOARD, line_min_loc, line_max_loc, ship_ind_list)
 
-    # 1-index for UI!
 
-    return (guess_coord[0]+1, guess_coord[1]+1)
-
-# main function that sets game in motion
 def play_game(verbose):
     global ACTIVE_HIT
     global LINE_FOUND
 
     counter = 0
     print("BATTLESHIP: NOTES")
-    print("—> 1-indexed: indices are [1, 1] to [10,10]")
+    print("—> 0-indexed: indices are [0, 0] to [9,9]")
 
     command = input("command: ")
     prev_r = -1
@@ -227,8 +328,8 @@ def play_game(verbose):
         length = len(comm_list)
         if(length == 3): # standard hit or miss
             # ex: '3 6 hit'
-            r = int(comm_list[0])-1 # back to 0-indexing!
-            c = int(comm_list[1])-1 # back to 0-indexing!
+            r = int(comm_list[0])
+            c = int(comm_list[1])
 
             is_hit = (comm_list[2] == 'hit')
             if(is_hit):
@@ -242,15 +343,15 @@ def play_game(verbose):
 
         if(length == 7): # some ship has been sunk
             # ex: '3 6 b 3 4 3 7'
-            r = int(comm_list[0]) - 1 # back to 0-indexing!
-            c = int(comm_list[1]) - 1 # back to 0-indexing!
+            r = int(comm_list[0])
+            c = int(comm_list[1])
             hit(r, c)
 
             ship_char = comm_list[2]
-            ship_minr = int(comm_list[3]) - 1
-            ship_minc = int(comm_list[4]) - 1
-            ship_maxr = int(comm_list[5]) - 1
-            ship_maxc = int(comm_list[6]) - 1
+            ship_minr = int(comm_list[3])
+            ship_minc = int(comm_list[4])
+            ship_maxr = int(comm_list[5])
+            ship_maxc = int(comm_list[6])
             v = ship_sunk(ship_char, ship_minr, ship_minc, ship_maxr, ship_maxc)
             if(v == 1):
                 print("Total moves:", counter)
@@ -264,7 +365,6 @@ def play_game(verbose):
 
         command = input('command: ')
         counter += 1
-        print(counter)
 
     return
 
@@ -428,6 +528,9 @@ def assess_adj(usr_brd, hit_loc, ship_inds):
     max_conf_ind = -1
 
     ADJ_CTR = [0, 0, 0, 0] # order: L, R, U, D (left, right, up, down counts)
+    # TBD: unclear if there is some nonuniform prob dist here between the different possibilities? (like [literal] edge cases less likely to be generated?)
+    # FOR NOW: assuming "IF POSSIBLE", then "EQUAL CHANCE OF FORM"
+    # ^^ this assumption is GLOBALLY TRUE: assuming all possible ship orientations are EQUALLY LIKELY (is that valid?? depends on ship assignment, i guess...)
 
     for x in range(len(SHIP_LENS)): # lowest to greatest length
         if(x not in ship_inds): # if it's already been found, ignore
@@ -439,6 +542,7 @@ def assess_adj(usr_brd, hit_loc, ship_inds):
         for left_ind in range(hit_c-ship_len+1, hit_c+1): # the left index of ship could be anywhere between these two values (pre-additional checking)
             VIABLE = True
             for step in range(left_ind, left_ind+ship_len):
+                # CHECK THIS UPDATE: MADE THIS 'H' condition stronger, right? (it HAS to be the hit location too, because we don't want to re-guess earlier H things)
                 if not(valid(hit_r, step) and (usr_brd[hit_r][step]=='' or (usr_brd[hit_r][step]=='H' and step==hit_c))): # other placed ships will have lowercase letter, these are not valid; misses are X; only CURRENT HITS are 'H'
                     VIABLE=False
 
@@ -540,6 +644,7 @@ def guess_vert_line(usr_brd, min_loc, max_loc, line_len, ship_inds):
                     VIABLE=False
 
             if(VIABLE):
+                # CHECK THESE CONDITIONS....
                 if(up_ind <= up_loc[0]):
                     up_cts+=1 # one config includes UP spot
                     if(up_cts>max_configs):
@@ -562,7 +667,6 @@ def guess_vert_line(usr_brd, min_loc, max_loc, line_len, ship_inds):
     else:
         return down_loc[0], down_loc[1]
 
-# direct analog to guess_vert_line
 def guess_horiz_line(usr_brd, min_loc, max_loc, line_len, ship_inds):
     global ACTIVE_HIT
     global LINE_FOUND
@@ -597,6 +701,7 @@ def guess_horiz_line(usr_brd, min_loc, max_loc, line_len, ship_inds):
                     VIABLE=False
 
             if(VIABLE):
+                # CHECK THESE CONDITIONS....
                 if(left_ind <= left_loc[1]):
                     left_cts+=1 # one config includes UP spot
                     if(left_cts>max_configs):
@@ -622,5 +727,75 @@ def guess_horiz_line(usr_brd, min_loc, max_loc, line_len, ship_inds):
 
 
 
-# ----- MAIN: PLAY THE GAME! ------ #
+# ----- PLAY THE GAME! ------ #
 play_game(verbose=False)
+
+
+
+
+
+
+
+
+
+
+### -------------------------------------------------------------------- ###
+### ---- CURRENTLY UNUSED STUFF ---- ###
+
+# # note: this is a little extra considering the process could be iterative, but restarting brute force each turn is fine for this:
+# #  only ~1000 operations
+# #
+# def assess_val(usr_brd):
+#     '''
+#      usr_brd: holds information about misses and hits on board
+#     '''
+#
+#     dp = np.zeros((BOARD_SZ, BOARD_SZ, len(SHIP_CHARS)+1, 2))
+#
+#     for length in range(1, len(SHIP_CHARS)+1):
+#         for dir in range(0, 2):
+#             for row in range(BOARD_SZ): # note: going from 0 to LEN-1, so DP is for whether RIGHT or BOTTOM edges ok
+#                 for col in range(BOARD_SZ):
+#
+#                     valid=(usr_brd[row][col]!='X')
+#                     if(length > 1):
+#                         if(dir == 0): # horizontal
+#                             valid=(valid and valid(row, col-1) and dp[row][col-1][length-1][dir])
+#                         else:         # vertical
+#                             valid=(valid and valid(row-1, col) and dp[row-1][col][length-1][dir])
+#
+#                     dp[row][col][length][dir]=valid
+#
+#     return dp
+#
+# def probe(i, j, usr_brd, comp_board):
+#     if(comp_board[i][j]==''):
+#         usr_brd[i][j]='X'
+#         print(i, j, "miss")
+#     else:
+#         usr_brd[i][j]='H'
+#         print(i, j, "hit")
+
+
+# prob_board = np.zeros((BOARD_SZ, BOARD_SZ))
+#
+#
+# for row in range(BOARD_SZ):
+#     for col in range(BOARD_SZ):
+#
+#         if(board[row][col]!=''): # THERE IS SOMETHING THERE
+#             for newc in range(col-ship_len+1, col):
+#                 if(not valid(row, newc)):
+#                     continue
+#                 states[row][newc][0]=False # could be overwriting something that's already False, that's fine (can put inside 'if' as well, doesn't matter)
+#                 remove_ind = get_ind(row, newc, 0)
+#                 if(remove_ind in rem_states):
+#                     rem_states.remove(remove_ind)
+#
+#             for newr in range(row-ship_len+1, row):
+#                 if(not valid(newr, col)):
+#                     continue
+#                 states[newr][col][1]=False
+#                 remove_ind = get_ind(newr, col, 1)
+#                 if(remove_ind in rem_states):
+#                     rem_states.remove(remove_ind)

@@ -436,6 +436,37 @@ def constrained_guess(usr_midsample_board):
     return np.array([guess_r, guess_c])
 
 
+# *** NEEDS TESTING ***
+# default: tries to find spots where a 2-ship could be placed (in any direction) and randomly guesses
+def default_guess(usr_brd):
+    poss_guesses = {1:[], 2:[], 3:[], 4:[]}
+    for row in len(BOARD_SZ):
+        for col in len(BOARD_SZ):
+            # search for whether (row, col) can be LEFT, RIGHT, UP, or DOWN – and add for each
+            unblckd = unblocked(usr_brd, row, col)
+            if(not unblckd):
+                continue
+
+            dr=[0, 0, -1, 1]
+            dc=[-1, 1, 0, 0]
+            orient = 0
+            for i in range(len(dr)):
+                if(unblocked(usr_brd, row+dr, col+dc)):
+                    orient+=1
+
+            poss_guesses[orient].append(10*row+col)
+
+    for i in range(len(dr)):
+        guess_list = poss_guesses[len(dr)-i-1]
+        if(len(guess_list)>0):
+            guess_move = guess_list[random.randint(0, len(guess_list)-1)]
+            return int(guess_move/10), int(guess_move%10)
+
+    return -1, -1
+# check whether (r,c) is valid and either 'H', '', or 'SIM_X': otherwise blocked ('X', 'c/b/d/s/p')
+def unblocked(usr_brd, r, c):
+    return valid(r, c) and (usr_brd[r][c]=='' or usr_brd[r][c]=='H' or len(usr_brd[r][c])>1)
+
 
 # run_sim is basically the function you want to call if not in an active hit situation
 def run_sim(usr_brd, n, ship_inds):

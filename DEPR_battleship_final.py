@@ -2,6 +2,11 @@
 ## computational solver
 ## based on probabilistic computations (using randomized sampling of statespace)
 ##
+## UPDATED PER PROBLEM STATEMENT
+## -- coordinates are given and received as (1,1) to (10, 10)
+##
+## author: Arya Maheshwari
+##
 ## OPERATION INSTRUCTIONS:
 ## – can run from terminal by typing "python battleship.py"
 ## - after each command from user, algorithm will suggest which square to probe
@@ -12,9 +17,9 @@
 ##     which spanned [minR --> maxR] and [minC --> maxC] (note that one of these pairs should always be the same)
 ##  - "R C hit" to indicate that user's guess of [R, C] was a hit, but did NOT SINK any ships
 ##
-## author: Arya Maheshwari
 ##
-## created: 12.07.20
+## created: 01.09.21 / 12.07.20
+## TO BE UPDATED with SIMULATION FIXES
 
 
 import sys
@@ -139,12 +144,12 @@ def ship_sunk(ship_char, ship_r_min, ship_c_min, ship_r_max, ship_c_max):
         for col in range(BOARD_SZ):
             if(USER_BOARD[row][col]=='H'):
                 ACTIVE_HIT=True
-                print(row, col)
+                # print(row, col)
                 hit_loc=[row, col]
 
                 min_c, max_c = find_minmax_horiz(USER_BOARD, row, col)
                 if(min_c is None):
-                    print('looking for vertical lines')
+                    # print('looking for vertical lines')
                     min_r, max_r = find_minmax_vert(USER_BOARD, row, col)
                     line_min_loc = [min_r, col]
                     line_max_loc = [max_r, col]
@@ -167,7 +172,7 @@ def find_minmax_horiz(usr_brd, orig_r, orig_c):
     min, max = None, None
     for col in range(BOARD_SZ):
         if(usr_brd[orig_r][col]=='H'):
-            print('found an H')
+            # print('found an H')
             max = col
             if not(min_found):
                 min=col
@@ -179,7 +184,7 @@ def find_minmax_vert(usr_brd, orig_r, orig_c):
     min, max = None, None
     for row in range(BOARD_SZ):
         if(usr_brd[row][orig_c]=='H'):
-            print('found an H')
+            # print('found an H')
             max = row
             if not(min_found):
                 min=row
@@ -191,14 +196,19 @@ def find_move():
     global ACTIVE_HIT
     global LINE_FOUND
 
+    guess_coord = None
     if(not ACTIVE_HIT):
-        return run_sim(USER_BOARD, N, ship_ind_list)
+        guess_coord= run_sim(USER_BOARD, N, ship_ind_list)
 
     elif(ACTIVE_HIT and not LINE_FOUND):
-        return assess_adj(USER_BOARD, hit_loc, ship_ind_list)
+        guess_coord= assess_adj(USER_BOARD, hit_loc, ship_ind_list)
 
     else: # both are true
-        return guess_line(USER_BOARD, line_min_loc, line_max_loc, ship_ind_list)
+        guess_coord= guess_line(USER_BOARD, line_min_loc, line_max_loc, ship_ind_list)
+
+    # 1-index for UI!
+
+    return (guess_coord[0]+1, guess_coord[1]+1)
 
 # main function that sets game in motion
 def play_game(verbose):
@@ -207,7 +217,7 @@ def play_game(verbose):
 
     counter = 0
     print("BATTLESHIP: NOTES")
-    print("—> 0-indexed: indices are [0, 0] to [9,9]")
+    print("—> 1-indexed: indices are [1, 1] to [10,10]")
 
     command = input("command: ")
     prev_r = -1
@@ -218,8 +228,8 @@ def play_game(verbose):
         length = len(comm_list)
         if(length == 3): # standard hit or miss
             # ex: '3 6 hit'
-            r = int(comm_list[0])
-            c = int(comm_list[1])
+            r = int(comm_list[0])-1 # back to 0-indexing!
+            c = int(comm_list[1])-1 # back to 0-indexing!
 
             is_hit = (comm_list[2] == 'hit')
             if(is_hit):
@@ -233,15 +243,15 @@ def play_game(verbose):
 
         if(length == 7): # some ship has been sunk
             # ex: '3 6 b 3 4 3 7'
-            r = int(comm_list[0])
-            c = int(comm_list[1])
+            r = int(comm_list[0]) - 1 # back to 0-indexing!
+            c = int(comm_list[1]) - 1 # back to 0-indexing!
             hit(r, c)
 
             ship_char = comm_list[2]
-            ship_minr = int(comm_list[3])
-            ship_minc = int(comm_list[4])
-            ship_maxr = int(comm_list[5])
-            ship_maxc = int(comm_list[6])
+            ship_minr = int(comm_list[3]) - 1
+            ship_minc = int(comm_list[4]) - 1
+            ship_maxr = int(comm_list[5]) - 1
+            ship_maxc = int(comm_list[6]) - 1
             v = ship_sunk(ship_char, ship_minr, ship_minc, ship_maxr, ship_maxc)
             if(v == 1):
                 print("Total moves:", counter)
@@ -255,6 +265,8 @@ def play_game(verbose):
 
         command = input('command: ')
         counter += 1
+        print("Moves so far:", counter, "\n\n")
+
 
     return
 
