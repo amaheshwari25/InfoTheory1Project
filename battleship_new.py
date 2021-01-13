@@ -73,7 +73,11 @@ def grid_ind(r, c):
     return BOARD_SZ*r + c
 
 # ---------------- #
-N_SAMPLES = 1000
+# MUST BE AN INTEGER
+TOP_THRESH = int(max(20, 0.0002 * N)) # 10 boards each time, after 0
+MAX_THRESH = 50000
+N_SAMPLES = 200000
+
 SAMPLE_ARRAY = np.zeros((N_SAMPLES, BOARD_SZ, BOARD_SZ), dtype='int')
 
 SORTED_INDS = SortedList()
@@ -485,8 +489,10 @@ def gen_sample(ship_inds, array_ind):
                 new_i1 = i1+k
                 new_i2 = i2
 
-
-            SAMPLE_ARRAY[array_ind][new_i1][new_i2]=1 # 1 = mid-ship
+            if(k == 0 or k==ship_len-1):
+                SAMPLE_ARRAY[array_ind][new_i1][new_i2]=2
+            else:
+                SAMPLE_ARRAY[array_ind][new_i1][new_i2]=1 # 1 = mid-ship
 
             remove_ind = get_ind(new_i1, new_i2, i3)
             if(remove_ind in rem_states):
@@ -523,7 +529,23 @@ def update_user_board(usr_brd, guess_set, r, c, response_val):
 
     for i in range(N_SAMPLES):
         sample_board_val = SAMPLE_ARRAY[i][r][c]
-        update_dist(i, abs(response_val-sample_board_val)) # this is basically XOR!
+
+        if(response_val == 1 and sample_board_val==2):
+            continue
+        elif(response_val != sample_board_val):
+            update_dist(i, 1)
+        #
+        # if(response_val == 1 and sample_board_val==0):
+        # # the one case where 2 options ok: if you get a hit (unsure whether endpoint or not), either hit or endpoint in board is fine
+        #     update_dist(i, 1)
+        # elif(response_val == 2 and sample_board_val==1):
+        # # this is close, so only penalize by 0.5
+        #     update_dist(i, 0.5) # WAIT: should be penalizing this fully ... --> NEW FRAMEWORK ABOVE
+        # elif(response_val == 2 and sample_board_val==0):
+        #     update_dist(i, 1)
+        # elif(response_val== 0 and sample_board_val > 0):
+        #     update_dist(i, 1)
+        # update_dist(i, abs(response_val-sample_board_val)) # this is basically XOR!
 
 def hit_updates(r, c):
     global ACTIVE_HIT
@@ -596,10 +618,10 @@ def find_guess(top_sample_thresh, guess_set):
     print('num 0 dist boards:', num_zero_dist)
 
     if(num_zero_dist>0):
-        thresh = num_zero_dist
+        thresh = min(MAX_THRESH, num_zero_dist)
 
-    if(num_zero_dist==1):
-        print_board(SAMPLE_ARRAY[SORTED_INDS[0][1]])
+    # if(num_zero_dist==1):
+    #     print_board(SAMPLE_ARRAY[SORTED_INDS[0][1]])
 
 
     for r in range(BOARD_SZ):
@@ -660,14 +682,35 @@ def print_board(brd):
                 str+='_'
             elif(brd[r][c]==0):
                 str+='X'
-            else:
+            elif(brd[r][c]==1):
                 str+='H'
+            else:
+                str+='S'
         print(str)
 
 def play_game(top_sample_thresh):
     global GUESSED_SET
     global USER_BOARD
     global END_FLAG
+
+    global N_SAMPLES
+    global MAX_THRESH
+    global TOP_THRESH
+
+    print("welcome to battleship.")
+    print("KEY PARAMETERS: (1) number of initial samples, (2) max. number of samples to consider per move, (3) min. number of (non-zero) distance samples to consider per move. Type -1 for defaults.")
+    user_nsamples = int(input("1. number of samples? (default: " + str(N_SAMPLES)+")"))
+    user_maxthresh = int(input("2. max. num. samples per move? (default: " + str(MAX_THRESH)+")"))
+    user_topthresh = int(input("3. min. num. of non-zero-dist samples per move? (default: " + str(TOP_THRESH)+")"))
+
+    if(user_nsamples!=-1):
+        N_SAMPLES=user_nsamples
+    if(user_maxthresh!=-1):
+        MAX_THRESH=user_maxthresh
+    if(user_topthresh!=-1):
+        TOP_THRESH=user_topthresh
+
+
 
     gen_n_samples(N_SAMPLES)
     # for i in range(N_SAMPLES):
@@ -689,7 +732,7 @@ def play_game(top_sample_thresh):
                 update_user_board(USER_BOARD, GUESSED_SET, r, c, 1)
             elif(comm_int==2):
                 sink_updates(r,c)
-                update_user_board(USER_BOARD, GUESSED_SET, r, c, 1) # no differentiation between "hit" and "hit and sunk" here
+                update_user_board(USER_BOARD, GUESSED_SET, r, c, 2) # no differentiation between "hit" and "hit and sunk" here
             elif(comm_int==0):
                 update_user_board(USER_BOARD, GUESSED_SET, r, c, 0)
             else:
@@ -709,13 +752,10 @@ def play_game(top_sample_thresh):
         # prev_r = r
         # prev_c = c
 
-        print("Guesses so far:", len(GUESSED_SET), "\n\n")
+        print("Guesses so far (including this query):", len(GUESSED_SET)+1) # because this query has not actually been placed in guessed_set yet
         # print(len(SORTED_INDS))
         command=input("command: ")
-
-
-# MUST BE AN INTEGER
-TOP_THRESH = int(max(50, 0.0005 * N)) # 50 boards each time, after 0
+        print("\n")
 
 
 play_game(TOP_THRESH)
