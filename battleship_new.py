@@ -698,6 +698,7 @@ def play_game(top_sample_thresh):
     global TOP_THRESH
 
     print("welcome to battleship.")
+    print("COMMANDS: 0 for 'Miss', 1, for 'Hit', 2 for 'Hit and Sunk'")
     print("KEY PARAMETERS: (1) number of initial samples, (2) max. number of samples to consider per move, (3) min. number of (non-zero) distance samples to consider per move. Type -1 for defaults.")
     user_nsamples = int(input("1. number of samples? (default: " + str(N_SAMPLES)+")"))
     user_maxthresh = int(input("2. max. num. samples per move? (default: " + str(MAX_THRESH)+")"))
