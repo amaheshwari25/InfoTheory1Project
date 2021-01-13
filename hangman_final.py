@@ -166,7 +166,6 @@ class Word:
     # If lie already detected, than assumes all wrong letters genuinely wrong.
     def update_word_lists(self, wrong_letters):
         self.possible_word_lists = [eliminate_words(self.init_word_list, self.known, self.eliminated_letters)]
-
         if not self.lied:
             for i in range(0, len(wrong_letters)):
                 temp_elim = self.eliminated_letters.copy()
@@ -292,17 +291,17 @@ def play_game():
         wrong = True    # wrong flag if all letters wrong
 
         for i in range(0, len(words)):  # iterate over words
-            if not words[i].guessed:    # if word hasn't been guessed already
-                ans = input("Type out word %d with * for all letters that are not %s :\n" % (i + 1, my_guess)).lower()
+            ans = input("Type out word %d with * for all letters that are not %s :\n" % (i + 1, my_guess))
 
-                if not ans.islower():   # if no letters exist in the string
-                    words[i].eliminated_letters += my_guess
-                else:
-                    wrong = False
-                    words[i].update_known(list(ans))
+            if not ans.islower():
+                words[i].eliminated_letters += my_guess
+            else:
+                wrong = False
+                words[i].update_known(list(ans))
 
-                if words[i].best_guess() is None:   # if any word has not been guessed yet
-                    guessed = False
+            # CHANGE THIS WIN CONDITION
+            if words[i].best_guess() is None:
+                guessed = False
 
         if wrong:
             if my_guess in wrong_letters:
