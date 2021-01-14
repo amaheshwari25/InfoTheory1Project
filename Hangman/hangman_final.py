@@ -185,7 +185,7 @@ class Word:
     # If no potential words remain, sets self.unknown_word to True and simply begins guessing most likely
     # letters based on the length of the word.
     #
-    def return_dist(self):
+    def return_dist(self, wrong_letters):
         expected_dist = [0.0] * 26
 
         for word_list in self.possible_word_lists:
@@ -204,8 +204,9 @@ class Word:
 
         if self.unknown_word:
             expected_dist = smart_prob_dist(prob_dist(self.init_word_list), self.known)
-            if self.lied:
-                for c in self.eliminated_letters:
+            print(self.eliminated_letters)
+            for c in self.eliminated_letters:
+                if self.lied or (c not in wrong_letters):
                     expected_dist[ord(c) - a_offset] = 0
 
         return expected_dist
@@ -221,6 +222,7 @@ class Word:
     def set_lied(self, letter):
         self.lied = True
         self.eliminated_letters.remove(letter)
+
 
 # -----------------------------------------------------------------------------
 # play_game() is essentially the main method, containing the game loop.
@@ -268,7 +270,7 @@ def play_game():
         for word in words:
             print(word)
             word.update_word_lists(wrong_letters)
-            word_dist = word.return_dist()
+            word_dist = word.return_dist(wrong_letters)
             for j in range(0, 26):
                 overall_prob_dist[j] *= 1 - word_dist[j]
 
