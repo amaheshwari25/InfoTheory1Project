@@ -97,6 +97,7 @@ GUESSED_SET = set() #0 to 99, 10*r + c to note if guessed or not
 SINK_CTR = 0
 END_FLAG = False
 
+VERBOSE = False
 
 
 query_log = np.zeros((BOARD_SZ**2, 3), dtype=int) # [0] = r, [1] = c, [2] = response_val
@@ -534,7 +535,7 @@ def gen_n_samples(n, usr_brd):
     global SHIP_LEN
 
     if(fs_ctr==0): # this is the initial sample, then
-        print("Generating initial sample of configurations...this could take a couple minutes.")
+        print("Generating initial sample of configurations...this could take some time.")
 
     start = time.time()
 
@@ -558,7 +559,7 @@ def gen_n_samples(n, usr_brd):
         #     print(i)
 
     end = time.time()
-    if(fs_ctr==0):
+    if(fs_ctr==0 and VERBOSE):
         print("gen sample total time:", end-start)
 
     return
@@ -856,7 +857,9 @@ def find_guess(top_sample_thresh, guess_set):
     num_zero_dist = 0
     while(num_zero_dist<N_SAMPLES and SORTED_INDS[num_zero_dist][0]==0):
         num_zero_dist+=1
-    print('num 0 dist boards:', num_zero_dist)
+
+    if(VERBOSE):
+        print('num 0 dist boards:', num_zero_dist)
 
     if(num_zero_dist>0):
         thresh = min(MAX_THRESH, num_zero_dist)
@@ -899,15 +902,18 @@ def find_move(top_sample_thresh):
     global USER_BOARD
 
     if(not ACTIVE_HIT and not LINE_FOUND):
-        print("CASE 1: SAMPLE-BASED GUESSING")
+        if(VERBOSE):
+            print("CASE 1: SAMPLE-BASED GUESSING")
         return find_guess(top_sample_thresh, GUESSED_SET)
 
     elif(ACTIVE_HIT and not LINE_FOUND):
-        print("CASE 2: ACTIVE_HIT + ASSESS_ADJ:", to_one_index(hit_loc))
+        if(VERBOSE):
+            print("CASE 2: ACTIVE_HIT + ASSESS_ADJ:", to_one_index(hit_loc))
         return assess_adj(USER_BOARD, hit_loc)
 
     else: #ACTIVE_HIT and LINE_FOUND both True
-        print("CASE 3: LINE GUESSING: min:", to_one_index(line_min_loc), "; max:", to_one_index(line_max_loc))
+        if(VERBOSE):
+            print("CASE 3: LINE GUESSING: min:", to_one_index(line_min_loc), "; max:", to_one_index(line_max_loc))
         return guess_line(USER_BOARD, hit_loc, line_min_loc, line_max_loc)
 
 def to_one_index(loc):
@@ -943,6 +949,7 @@ def play_game(top_sample_thresh):
     global N_SAMPLES
     global MAX_THRESH
     global TOP_THRESH
+    global VERBOSE
 
     print("welcome to battleship.")
     print("COMMANDS: 0 for 'Miss', 1, for 'Hit', 2 for 'Hit and Sunk'")
@@ -950,6 +957,7 @@ def play_game(top_sample_thresh):
     user_nsamples = int(input("1. number of samples? (default: " + str(N_SAMPLES)+")"))
     user_maxthresh = int(input("2. max. num. samples per move? (default: " + str(MAX_THRESH)+")"))
     user_topthresh = int(input("3. min. num. of non-zero-dist samples per move? (default: " + str(TOP_THRESH)+")"))
+    user_verbose = int(input("4. Verbose? 1 for yes, anything other integer for no."))
 
     if(user_nsamples!=-1):
         N_SAMPLES=user_nsamples
@@ -957,6 +965,8 @@ def play_game(top_sample_thresh):
         MAX_THRESH=user_maxthresh
     if(user_topthresh!=-1):
         TOP_THRESH=user_topthresh
+    if(user_verbose==1):
+        VERBOSE=True
 
 
 
@@ -966,7 +976,7 @@ def play_game(top_sample_thresh):
     #     print_board(SAMPLE_ARRAY[i])
     #     print()
 
-    command = input("command: ")
+    command = "start"
     FIRST_FLAG = True
     # prev_r = -1
     # prev_c = -1
@@ -987,7 +997,7 @@ def play_game(top_sample_thresh):
             else:
                 print("Please enter a valid guess.")
 
-    
+
         FIRST_FLAG = False
         print_board(USER_BOARD)
         if(END_FLAG):
@@ -996,7 +1006,8 @@ def play_game(top_sample_thresh):
 
 
         # print(SORTED_INDS)
-        print("closest board distance", SORTED_INDS[0][0])
+        if(VERBOSE):
+            print("closest board distance", SORTED_INDS[0][0])
 
         r, c = find_move(top_sample_thresh)
         print("Query:", to_one_index((r, c))) # 1-index!!
