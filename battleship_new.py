@@ -74,9 +74,9 @@ def grid_ind(r, c):
 
 # ---------------- #
 # MUST BE AN INTEGER
-TOP_THRESH = int(max(20, 0.0002 * N)) # 10 boards each time, after 0
-MAX_THRESH = 50000
-N_SAMPLES = 200000
+TOP_THRESH = int(max(20, 0.0002 * N)) # 20 boards each time, after 0
+MAX_THRESH = min(50000, N_SAMPLES)
+N_SAMPLES = 10000
 
 SAMPLE_ARRAY = np.zeros((N_SAMPLES, BOARD_SZ, BOARD_SZ), dtype='int')
 
@@ -97,8 +97,15 @@ GUESSED_SET = set() #0 to 99, 10*r + c to note if guessed or not
 SINK_CTR = 0
 END_FLAG = False
 
+
+
+query_log = np.zeros((BOARD_SZ**2, 3), dtype=int) # [0] = r, [1] = c, [2] = response_val
+sink_data = np.zeros((len(SHIP_LENS), 4), dtype=int) #[0] = sink_r, [1] = sink_c, [2] = dr, [3] = dc
+fixed_ship = np.zeros((len(SHIP_LENS), 5), dtype=int) # [0] = sink_r, [1] = sink_c, [2] = other_r, [3] = other_c, [4] = len
+fs_ctr = 0
+
 ### ------------------------------------------------------------ ###
-### -------------------- GAMEPLAY FUNCTIONS -------------------- ###
+### -------------------- INTNERAL GAMEPLAY FUNCTIONS -------------------- ###
 
 ## DELETED SHIP_INDS FROM EVERYTHING: that never changes anymore... ##
 
@@ -413,7 +420,7 @@ def unblocked(usr_brd, r, c):
 
 # generate one possible simulation instance given current board state
 # SET-BASED NOW
-def gen_sample(ship_inds, array_ind):
+def gen_sample(ship_inds, array_ind, usr_brd):
 
     global BOARD_SZ
     global SHIP_LENS
@@ -426,6 +433,16 @@ def gen_sample(ship_inds, array_ind):
     '''
 
     # start_time = time.time()
+
+    new_board = np.zeros((BOARD_SZ, BOARD_SZ), dtype=int)
+    for r in range(BOARD_SZ):
+        for c in range(BOARD_SZ):
+            if(usr_brd[r][c]==0):
+                new_board[r][c]=-1 # WATCH OUT: sample board conventions are DIFFERENT from user_board: a 0 on user_board = miss = -1 on sample board
+            elif(usr_brd[r][c]==3):
+                new_board[r][c]=3 # here, sample board 3 = user board 3 = confirmed ship
+                # note that ANYWHERE a 3 gets placed should NEVER be queried again: already guessed, that's how we know it's a ship
+
 
     # rem_states = list()
     rem_states = set()
@@ -456,7 +473,8 @@ def gen_sample(ship_inds, array_ind):
         for row in range(BOARD_SZ):
             for col in range(BOARD_SZ):
 
-                if(SAMPLE_ARRAY[array_ind][row][col]!=0): # THERE IS SOMETHING THERE
+                # new_board instead of direct SAMPLE_ARRAY is NEW
+                if(new_board[row][col]!=0): # THERE IS SOMETHING THERE: 1 and 2 for other ships placed, -1 for miss, 3 for a confirmed ship placed
                     for newc in range(col-ship_len+1, col+1): # NEW ADDITION: REMEMBER — *ALSO GET RID OF THIS POSITION*, and range is < not ≤
                         if(not valid(row, newc)):
                             continue
@@ -490,9 +508,9 @@ def gen_sample(ship_inds, array_ind):
                 new_i2 = i2
 
             if(k == 0 or k==ship_len-1):
-                SAMPLE_ARRAY[array_ind][new_i1][new_i2]=2
+                new_board[new_i1][new_i2]=2
             else:
-                SAMPLE_ARRAY[array_ind][new_i1][new_i2]=1 # 1 = mid-ship
+                new_board[new_i1][new_i2]=1 # 1 = mid-ship
 
             remove_ind = get_ind(new_i1, new_i2, i3)
             if(remove_ind in rem_states):
@@ -502,38 +520,171 @@ def gen_sample(ship_inds, array_ind):
             if(remove_ind in rem_states):
                 rem_states.remove(remove_ind)
 
+    SAMPLE_ARRAY[array_ind]=new_board
     # print(SAMPLE_ARRAY[array_ind])
     return
 
-def gen_n_samples(n):
+def gen_n_samples(n, usr_brd):
     global USER_BOARD
     global ship_ind_list
+    global fs_ctr
+    global SHIP_LEN
+
+    if(fs_ctr==0): # this is the initial sample, then
+        print("Generating initial sample of configurations...this could take a couple minutes.")
 
     start = time.time()
 
+    updated_shipind_list = copy.deepcopy(ship_ind_list)
+    for x in range(fs_ctr):
+        x_len = fixed_ship[x][4]
+        removable = -1
+        for val in updated_shipind_list:
+            if(SHIP_LENS[val]==x_len):
+                removable=val
+                continue
+        if(removable>-1):
+            updated_shipind_list.remove(removable)
+        else:
+            print("should NEVER have an unremovable length / length that is not found in ship_ind_list...")
 
     for i in range(n):
-        gen_sample(ship_ind_list, i)
+        gen_sample(updated_shipind_list, i, usr_brd)
+        # gen_sample(ship_ind_list, i, usr_brd)
         # if(i%(n/20)==0):
         #     print(i)
 
     end = time.time()
-    print("gen sample total time:", end-start)
+    if(fs_ctr==0):
+        print("gen sample total time:", end-start)
 
     return
+
+# TESTED - should be working now
+def evaluate_fixed_ship(usr_brd):
+    global SINK_CTR
+    global sink_data
+    global fs_ctr
+    global fixed_ship
+
+
+    new_fs_ctr = 0
+    for i in range(SINK_CTR):
+        sink_r, sink_c, dr, dc = sink_data[i][0], sink_data[i][1], sink_data[i][2], sink_data[i][3]
+        if(dr == 0 and dc == 0):
+            continue
+
+        pos_r = sink_r+dr
+        pos_c = sink_c+dc
+        while(valid(pos_r, pos_c) and (usr_brd[pos_r][pos_c]==1 or usr_brd[pos_r][pos_c]==3)): # it's a hit, NOT another sink – and note that it COULD be a FULLY placed ship already as well! 1 or 3!
+            pos_r+=dr
+            pos_c+=dc
+        # undo going one extra
+        pos_r-=dr
+        pos_c-=dc
+
+        dr_list = [-1, 1, 0, 0]
+        dc_list = [0, 0, -1, 1]
+        enclosed = True
+        for dir in range(len(dr_list)):
+            if((dr_list[dir], dc_list[dir])==(-dr, -dc)): # ignore the ship body from which you are coming, obviously (opposite direction of dr / dc steps)
+                # print((dr_list[dir], dc_list[dir]), (-dr, -dc))
+                continue
+            adjpos_r = pos_r+dr_list[dir]
+            adjpos_c = pos_c+dc_list[dir]
+            if(valid(adjpos_r, adjpos_c) and usr_brd[adjpos_r][adjpos_c]!=0): # could actually place it there / doesn't meet condition
+                enclosed=False
+
+        if(enclosed):
+            new_fs_ctr+=1
+            fixed_ship[fs_ctr][0]=sink_r
+            fixed_ship[fs_ctr][1]=sink_c
+            fixed_ship[fs_ctr][2]=pos_r
+            fixed_ship[fs_ctr][3]=pos_c
+            fixed_ship[fs_ctr][4]=max(abs(sink_r-pos_r)+1, abs(sink_c-pos_c)+1)
+
+    if(new_fs_ctr > fs_ctr):
+        print("NEW SHIP(S) PLACED! full data:")
+        print(fixed_ship)
+        print(sink_data)
+        fs_ctr = new_fs_ctr
+        post_fix_resample(usr_brd)
+        return True
+
+
+    return False
+
+# called once you have placed a new ship
+def post_fix_resample(usr_brd):
+    global fs_ctr
+    global fixed_ship
+
+    for i in range(fs_ctr):
+        end1_r, end1_c, end2_r, end2_c, len = fixed_ship[i][0], fixed_ship[i][1], fixed_ship[i][2], fixed_ship[i][3], fixed_ship[i][4]
+        min_r = min(end1_r, end2_r)
+        max_r = max(end1_r, end2_r)
+        min_c = min(end1_c, end2_c)
+        max_c = max(end1_c, end2_c)
+
+        # place the ship on user board
+        if(min_r == max_r):
+            for col in range(min_c, max_c+1):
+                usr_brd[min_r][col]=3 # 3 now represents a FULLY PLACED SHIP
+        else: # ship_c_min == ship_c_max
+            for row in range(min_r, max_r+1):
+                usr_brd[row][min_c]=3
+
+    #now, trigger the (re)sampling routine *WITH THE GIVEN USER_BOARD STATE*
+    gen_n_samples(N_SAMPLES, usr_brd)
+    reset_sample_dist_list(usr_brd)
+    print(N_SAMPLES, "new samples generated: here is example of closest-distance board")
+    print(SAMPLE_ARRAY[SORTED_INDS[0][1]])
+
+def reset_sample_dist_list(usr_brd):
+    global SORTED_INDS
+    global IND_VALUES
+    global N_SAMPLES
+    global query_log
+    global GUESSED_SET
+
+    # RESET THESE DATA STRUCTURES
+    SORTED_INDS = SortedList()
+    IND_VALUES = {}
+
+    num_queries = len(GUESSED_SET)
+
+    for i in range(N_SAMPLES):
+        dist = 0
+        for q in range(num_queries):
+            q_r, q_c, q_val = query_log[q][0], query_log[q][1], query_log[q][2]
+            sample_val = SAMPLE_ARRAY[i][q_r][q_c]
+
+            if(q_val == 0 or (q_val==1 and sample_val==3) or (q_val==2 and sample_val==3) or (q_val==1 and sample_val==2)):
+                continue
+            # CASE_WORK:
+            #   if q_val = 0, then ALL sample_boards currently have that miss.
+            #   if q_val = 1 or 2 and NOW it's a 3 on usr_brd, then sample_board ALSO has that correct.
+            #   so only need to update non-3 1s that are NOT 1s or 2s ; non-3 2s that are NOT 2s
+            elif(q_val != sample_val):
+                # print(q_val, sample_val)
+                dist+=1
+
+        SORTED_INDS.add((dist, i))
+        IND_VALUES[i]=dist
+
 
 def update_user_board(usr_brd, guess_set, r, c, response_val):
     # 0 = miss, 1 = hit
     usr_brd[r][c]=response_val
+    query_log[len(guess_set)][0]=r
+    query_log[len(guess_set)][1]=c
+    query_log[len(guess_set)][2]=response_val
     guess_set.add(grid_ind(r,c))
 
-    for i in range(N_SAMPLES):
-        sample_board_val = SAMPLE_ARRAY[i][r][c]
+    update_all_sample_dist(r, c, response_val)
 
-        if(response_val == 1 and sample_board_val==2):
-            continue
-        elif(response_val != sample_board_val):
-            update_dist(i, 1)
+    new_fixed = evaluate_fixed_ship(usr_brd)
+    #then: if true ... go do a ton of new things
         #
         # if(response_val == 1 and sample_board_val==0):
         # # the one case where 2 options ok: if you get a hit (unsure whether endpoint or not), either hit or endpoint in board is fine
@@ -546,6 +697,20 @@ def update_user_board(usr_brd, guess_set, r, c, response_val):
         # elif(response_val== 0 and sample_board_val > 0):
         #     update_dist(i, 1)
         # update_dist(i, abs(response_val-sample_board_val)) # this is basically XOR!
+
+def update_all_sample_dist(r, c, response_val):
+    global N_SAMPLES
+    global SAMPLE_ARRAY
+
+    for i in range(N_SAMPLES):
+        sample_board_val = SAMPLE_ARRAY[i][r][c]
+
+        if(response_val == 1 and sample_board_val==2):
+            continue
+        elif(response_val != sample_board_val):
+            update_dist(i, 1)
+        # THIS SHOULDNT CHANGE WITH 3s NOW, RIGHT?
+
 
 def hit_updates(r, c):
     global ACTIVE_HIT
@@ -580,13 +745,80 @@ def sink_updates(r, c):
     global LINE_FOUND
     global END_FLAG
 
-    SINK_CTR += 1
-    ACTIVE_HIT = False
-    LINE_FOUND = False
+    global hit_loc
+    global line_max_loc
+    global line_min_loc
 
+    SINK_CTR += 1
     if(SINK_CTR == 5):
         END_FLAG = True
         return
+
+    update_sink_data(r, c, SINK_CTR)
+
+    ACTIVE_HIT = False
+    LINE_FOUND = False
+
+    # THIS IS NEW: to be tested
+    hit_loc=[None, None]
+    line_max_loc=[None, None]
+    line_min_loc=[None, None]
+
+def update_sink_data(sink_r, sink_c, sink_num):
+    global sink_data
+    global hit_loc
+    global line_max_loc
+    global line_min_loc
+
+    # NOW SINK_NUM is NEW: so preprocess and decrement
+    sink_num-=1
+
+    sink_data[sink_num][0]=sink_r
+    sink_data[sink_num][1]=sink_c
+
+    dr = None
+    dc = None
+
+    if(LINE_FOUND):
+        if(line_max_loc[0]==sink_r):
+            if(sink_c >= line_max_loc[1]):
+                dr=0
+                dc=-1
+            else:
+                dr=0
+                dc=1
+        elif(line_max_loc[1]==sink_c):
+            if(sink_r >= line_max_loc[0]):
+                dr=-1
+                dc=0
+            else:
+                dr=1
+                dc=0
+        else:
+            print("Error in checking sink origin: sink loc is", to_one_index(sink_r, sink_c), "while line locs are", to_one_index(line_min_loc), to_one_index(line_max_loc))
+
+    elif(ACTIVE_HIT and not (hit_loc[0]==sink_r and hit_loc[1]==sink_c)):
+        if(hit_loc[0]==sink_r and hit_loc[1] < sink_c):
+            dr=0
+            dc=-1
+        elif(hit_loc[0]==sink_r and hit_loc[1] > sink_c):
+            dr=0
+            dc=1
+        elif(hit_loc[0] < sink_r and hit_loc[1] == sink_c):
+            dr=-1
+            dc=0
+        else:
+            dr=1
+            dc=0
+    else:
+        dr=0
+        dc=0
+        print("Hmm...no clear line found for this sink?")
+
+    sink_data[sink_num][2]=dr
+    sink_data[sink_num][3]=dc
+
+    return
 
 def update_dist(ind, delta):
     # hopefully this is speedy enough?
@@ -684,8 +916,10 @@ def print_board(brd):
                 str+='X'
             elif(brd[r][c]==1):
                 str+='H'
-            else:
+            elif(brd[r][c]==2):
                 str+='S'
+            else: # for 3, for a fully placed ship
+                str+='+'
         print(str)
 
 def play_game(top_sample_thresh):
@@ -713,7 +947,8 @@ def play_game(top_sample_thresh):
 
 
 
-    gen_n_samples(N_SAMPLES)
+    gen_n_samples(N_SAMPLES, USER_BOARD)
+    # print(SAMPLE_ARRAY)
     # for i in range(N_SAMPLES):
     #     print_board(SAMPLE_ARRAY[i])
     #     print()
