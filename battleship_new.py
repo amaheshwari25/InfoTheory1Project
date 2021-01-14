@@ -75,8 +75,8 @@ def grid_ind(r, c):
 # ---------------- #
 # MUST BE AN INTEGER
 TOP_THRESH = int(max(20, 0.0002 * N)) # 20 boards each time, after 0
-MAX_THRESH = min(50000, N_SAMPLES)
 N_SAMPLES = 10000
+MAX_THRESH = min(50000, N_SAMPLES)
 
 SAMPLE_ARRAY = np.zeros((N_SAMPLES, BOARD_SZ, BOARD_SZ), dtype='int')
 
@@ -637,8 +637,8 @@ def post_fix_resample(usr_brd):
     #now, trigger the (re)sampling routine *WITH THE GIVEN USER_BOARD STATE*
     gen_n_samples(N_SAMPLES, usr_brd)
     reset_sample_dist_list(usr_brd)
-    print(N_SAMPLES, "new samples generated: here is example of closest-distance board")
-    print(SAMPLE_ARRAY[SORTED_INDS[0][1]])
+    # print(N_SAMPLES, "new samples generated: here is example of closest-distance board")
+    # print(SAMPLE_ARRAY[SORTED_INDS[0][1]])
 
 def reset_sample_dist_list(usr_brd):
     global SORTED_INDS
@@ -907,9 +907,13 @@ def to_one_index(loc):
 ## --------- USER END FUNCTIONS ----------- #
 
 def print_board(brd):
-    for r in range(BOARD_SZ):
+    # NOTE: THIS PRINTS FLIPPED BOARD – because of (1, 1) for LEFT-BOTTOM ; (10, 10) for RIGHT-TOP
+    # we want the order to be in the user's request order, and then compute the internal r_comp and c_comp from that
+    for r_u in range(BOARD_SZ):
         str = ''
-        for c in range(BOARD_SZ):
+        for c_u in range(BOARD_SZ):
+            r = c_u
+            c = BOARD_SZ-r_u-1
             if(brd[r][c]==-1):
                 str+='_'
             elif(brd[r][c]==0):
