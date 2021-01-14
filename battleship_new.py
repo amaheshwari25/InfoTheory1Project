@@ -393,7 +393,7 @@ def default_guess(usr_brd):
     poss_guesses = {1:[], 2:[], 3:[], 4:[]}
     for row in range(BOARD_SZ):
         for col in range(BOARD_SZ):
-            # search for whether (row, col) can be LEFT, RIGHT, UP, or DOWN – and add for each
+            # search for whether (row, col) can be LEFT, RIGHT, UP, or DOWN - and add for each
             unblckd = unblocked(usr_brd, row, col)
             if(not unblckd):
                 continue
@@ -576,7 +576,7 @@ def evaluate_fixed_ship(usr_brd):
 
         pos_r = sink_r+dr
         pos_c = sink_c+dc
-        while(valid(pos_r, pos_c) and (usr_brd[pos_r][pos_c]==1 or usr_brd[pos_r][pos_c]==3)): # it's a hit, NOT another sink – and note that it COULD be a FULLY placed ship already as well! 1 or 3!
+        while(valid(pos_r, pos_c) and (usr_brd[pos_r][pos_c]==1 or usr_brd[pos_r][pos_c]==3)): # it's a hit, NOT another sink - and note that it COULD be a FULLY placed ship already as well! 1 or 3!
             pos_r+=dr
             pos_c+=dc
         # undo going one extra
@@ -865,7 +865,7 @@ def find_guess(top_sample_thresh, guess_set):
             unguessed_set.add(grid_rc)
 
             for i in range(thresh):
-                indd = SORTED_INDS[i][1] # THE KEY LINE! – we want *what index the ith in SORTED LIST corresponds to*
+                indd = SORTED_INDS[i][1] # THE KEY LINE! - we want *what index the ith in SORTED LIST corresponds to*
                 if(SAMPLE_ARRAY[indd][r][c]==1): #hit/has ship
                     master_counts[r][c]+=1
 
