@@ -437,11 +437,14 @@ def gen_sample(ship_inds, array_ind, usr_brd):
     new_board = np.zeros((BOARD_SZ, BOARD_SZ), dtype=int)
     for r in range(BOARD_SZ):
         for c in range(BOARD_SZ):
-            if(usr_brd[r][c]==0):
-                new_board[r][c]=-1 # WATCH OUT: sample board conventions are DIFFERENT from user_board: a 0 on user_board = miss = -1 on sample board
-            elif(usr_brd[r][c]==3):
-                new_board[r][c]=3 # here, sample board 3 = user board 3 = confirmed ship
-                # note that ANYWHERE a 3 gets placed should NEVER be queried again: already guessed, that's how we know it's a ship
+            if(usr_brd[r][c]==3):
+                new_board[r][c]=3
+            # OLD PROCEDURE: propagated misses
+            # if(usr_brd[r][c]==0):
+            #     new_board[r][c]=-1 # WATCH OUT: sample board conventions are DIFFERENT from user_board: a 0 on user_board = miss = -1 on sample board
+            # elif(usr_brd[r][c]==3):
+            #     new_board[r][c]=3 # here, sample board 3 = user board 3 = confirmed ship
+            #     # note that ANYWHERE a 3 gets placed should NEVER be queried again: already guessed, that's how we know it's a ship
 
 
     # rem_states = list()
@@ -474,7 +477,7 @@ def gen_sample(ship_inds, array_ind, usr_brd):
             for col in range(BOARD_SZ):
 
                 # new_board instead of direct SAMPLE_ARRAY is NEW
-                if(new_board[row][col]!=0): # THERE IS SOMETHING THERE: 1 and 2 for other ships placed, -1 for miss, 3 for a confirmed ship placed
+                if(new_board[row][col]!=0): # THERE IS SOMETHING THERE: 1 and 2 for other ships placed, (DEPR: -1 for miss), 3 for a confirmed ship placed
                     for newc in range(col-ship_len+1, col+1): # NEW ADDITION: REMEMBER — *ALSO GET RID OF THIS POSITION*, and range is < not ≤
                         if(not valid(row, newc)):
                             continue
@@ -659,12 +662,18 @@ def reset_sample_dist_list(usr_brd):
             q_r, q_c, q_val = query_log[q][0], query_log[q][1], query_log[q][2]
             sample_val = SAMPLE_ARRAY[i][q_r][q_c]
 
-            if(q_val == 0 or (q_val==1 and sample_val==3) or (q_val==2 and sample_val==3) or (q_val==1 and sample_val==2)):
+            if((q_val==1 and sample_val==3) or (q_val==2 and sample_val==3) or (q_val==1 and sample_val==2)):
                 continue
+            # if(q_val == 0 or (q_val==1 and sample_val==3) or (q_val==2 and sample_val==3) or (q_val==1 and sample_val==2)):
+            #     continue
+
+
             # CASE_WORK:
-            #   if q_val = 0, then ALL sample_boards currently have that miss.
+            #   (DEPR: NO LONGER TRUE: if q_val = 0, then ALL sample_boards currently have that miss.)
             #   if q_val = 1 or 2 and NOW it's a 3 on usr_brd, then sample_board ALSO has that correct.
             #   so only need to update non-3 1s that are NOT 1s or 2s ; non-3 2s that are NOT 2s
+
+            # need to incorporate q=0 now: misses matter
             elif(q_val != sample_val):
                 # print(q_val, sample_val)
                 dist+=1
@@ -978,12 +987,14 @@ def play_game(top_sample_thresh):
             else:
                 print("Please enter a valid guess.")
 
+    
         FIRST_FLAG = False
+        print_board(USER_BOARD)
         if(END_FLAG):
             print("Game over in", len(GUESSED_SET), "moves!")
             return
 
-        print_board(USER_BOARD)
+
         # print(SORTED_INDS)
         print("closest board distance", SORTED_INDS[0][0])
 
