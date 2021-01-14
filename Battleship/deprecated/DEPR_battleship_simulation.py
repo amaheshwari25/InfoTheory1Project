@@ -240,7 +240,8 @@ def find_move():
 
 
     else: # both are true
-        guess_coord= guess_line(USER_BOARD, line_min_loc, line_max_loc, ship_ind_list)
+        guess_coord= guess_line(USER_BOARD,
+        , ship_ind_list)
 
     if(guess_coord is None):
         print(ACTIVE_HIT, LINE_FOUND, guess_coord)

@@ -39,6 +39,9 @@ P = 2 # patrol boat length
 
 SHIP_LENS = [P, S, D, B, C]
 SHIP_CHARS = ['p', 's', 'd', 'b', 'c']
+board = np.zeros((BOARD_SZ, BOARD_SZ), dtype='str')
+
+# ---------------------------------------- #
 
 # index = i1 + BOARD_SZ*i2 + (BOARD_SZ^2)*i3
 def get_ind(i1, i2, i3):
@@ -56,7 +59,6 @@ def valid(r, c):
 ### ------------------------------------------------------------ ###
 ### ---- COMP GEN STUFF ---- ###
 
-board = np.zeros((BOARD_SZ, BOARD_SZ), dtype='str')
 
 
 ## PROCEDURE: generate random location where to place LEFT or TOP (after determining orientation) ##
