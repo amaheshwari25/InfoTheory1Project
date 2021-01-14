@@ -945,13 +945,13 @@ def play_game(top_sample_thresh):
     global TOP_THRESH
     global VERBOSE
 
-    print("welcome to battleship.")
-    print("COMMANDS: 0 for 'Miss', 1, for 'Hit', 2 for 'Hit and Sunk'")
-    print("KEY PARAMETERS: (1) number of initial samples, (2) max. number of samples to consider per move, (3) min. number of (non-zero) distance samples to consider per move. Type -1 for defaults.")
+    print("\nwelcome to battleship.\n")
+    print("COMMANDS: 0 for 'Miss', 1, for 'Hit', 2 for 'Hit and Sunk'\n")
+    print("KEY PARAMETERS: (1) number of initial samples, (2) max. number of samples to consider per move, (3) min. number of (non-zero) distance samples to consider per move. Type -1 for defaults.\n")
     user_nsamples = int(input("1. number of samples? (default: " + str(N_SAMPLES)+")"))
     user_maxthresh = int(input("2. max. num. samples per move? (default: " + str(MAX_THRESH)+")"))
     user_topthresh = int(input("3. min. num. of non-zero-dist samples per move? (default: " + str(TOP_THRESH)+")"))
-    user_verbose = int(input("4. Verbose? 1 for yes, anything other integer for no."))
+    user_verbose = int(input("4. Verbose? 1 for yes, any other integer for no."))
 
     if(user_nsamples!=-1):
         N_SAMPLES=user_nsamples
