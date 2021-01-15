@@ -249,10 +249,9 @@ def play_game(phrase, lie = None):
     string_words = phrase.lower().split()
     word_lens = [len(s) for s in string_words]
 
-    min_guess_length = len(set(string_words))
+    min_guess_length = len(set(phrase))
     if not lie: # lie exists
         min_guess_length -= 1
-
 
     words = []  # array of the Word objects used in this game
     for i in word_lens:

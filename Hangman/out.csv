@@ -1,0 +1,13 @@
+PHRASE, TOTAL_GUESSES, WRONG_GUESSES, MIN_LEN, LIE?
+the usual suspects, 10, 1, 9, 
+stars and stripes, 11, 2, 9, 
+jobs not finished, 16, 4, 12, i
+we talking about practice, 18, 3, 15, 
+just do it, 20, 12, 8, s
+handcrafted wooden hippopotamus and star, 17, 0, 17, a
+a bird in hand, 14, 7, 7, 
+zoom learning, 17, 7, 10, 
+information theory is awesome, 14, 0, 14, m
+uptown girl and downtown boy, 17, 3, 14, 
+the wizard whizzed down the walkway, 16, 2, 14, 
+the yachtsman yodels awkwardly, 16, 1, 15, 
