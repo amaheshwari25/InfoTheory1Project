@@ -245,11 +245,17 @@ class Word:
 #   The user then inputs the relevant positions of the character in each word of the phrase, which
 #
 #
-def play_game():
-    word_lens = input("Hi! Welcome to Hangman. Please enter a comma-separated list of word lengths:\n")
+def play_game(phrase, lie = None):
+    string_words = phrase.lower().split()
+    word_lens = [len(s) for s in string_words]
+
+    min_guess_length = len(set(string_words))
+    if not lie: # lie exists
+        min_guess_length -= 1
+
 
     words = []  # array of the Word objects used in this game
-    for i in word_lens.split(","):
+    for i in word_lens:
         words.append(Word(int(i)))
 
     guessed = False         # Flag to decide when to exit game loop
@@ -267,9 +273,9 @@ def play_game():
         for j in range(0, 26):
             overall_prob_dist.append(1)
 
-        print("Phrase so far: ")
+        # print("Phrase so far: ")
         for word in words:
-            print(word)
+            # print(word)
             word.update_word_lists(wrong_letters)
             word_dist = word.return_dist(wrong_letters)
             for j in range(0, 26):
@@ -289,13 +295,23 @@ def play_game():
         my_guess = chr(max_pos + a_offset)
         guessed_letters += my_guess
 
-        print("My guess is ", my_guess)
+        # print("My guess is ", my_guess)
         total_guesses += 1
 
         wrong = True    # wrong flag if all letters wrong
 
         for i in range(0, len(words)):  # iterate over words
-            ans = input("Type out word %d with * for all letters that are not %s :\n" % (i + 1, my_guess))
+            # ans = input("Type out word %d with * for all letters that are not %s :\n" % (i + 1, my_guess))
+            ans = ""
+
+            if my_guess == lie and my_guess not in wrong_letters:
+                ans = "*"
+            else:
+                for c in string_words[i]:
+                    if c == my_guess:
+                        ans += c
+                    else:
+                        ans += "*"
 
             if not ans.islower():
                 words[i].eliminated_letters += my_guess
@@ -319,19 +335,53 @@ def play_game():
             num_wrong += 1
         else:       # LIE DETECTOR
             if my_guess in wrong_letters:   # checks if the thing that was not wrong was earlier wrong
-                print("You lied! I am disappointed.")
+                # print("You lied! I am disappointed.")
                 for word in words:
                     word.set_lied(my_guess)
                 num_wrong -= 1
     # END GAME LOOP -----------------------
 
     if guessed:
-        print("My guess is:")
-        for word in words:
-            print(word.best_guess())
-        print("HAHA I WON! It took me %d total guesses with %d wrong guesses" %(total_guesses, num_wrong))
+        # print("My guess is:")
+        # for word in words:
+        #     print(word.best_guess())
+        # print("HAHA I WON! It took me %d total guesses with %d wrong guesses" %(total_guesses, num_wrong))
+        return[total_guesses, num_wrong, min_guess_length, lie]
     else:
         print("Oops I lost.")
 # END PLAY GAME
 
-play_game()
+
+def run_sim(in_filename, out_filename):
+    print("Running simulation...")
+    in_file = open(in_filename)
+    out_file = open(out_filename, 'w')
+
+    output = ["PHRASE, TOTAL_GUESSES, WRONG_GUESSES, MIN_LEN, LIE?\n"]
+
+    n = 0
+
+    for line in in_file:
+        print("Running Phrase %d..." % n)
+        n += 1
+
+        line = line.strip().split(', ')
+
+        phrase = line[0]
+        lie = ""
+
+        if len(line) > 1:
+            lie = line[1]
+
+        output.append(phrase + ", " + ', '.join(map(str, play_game(phrase, lie))) + "\n")
+
+    out_file.writelines(output)
+
+    in_file.close()
+    out_file.close()
+
+    print("simulation over. %d phrases run." % n)
+
+
+run_sim("in.txt", "out.csv")
+
